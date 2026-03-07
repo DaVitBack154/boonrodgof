@@ -4,6 +4,7 @@ const payrollRecordSchema = new mongoose.Schema({
   employee: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee', required: true },
   period: { type: String, required: true },          // e.g. "2024-02"
   periodLabel: { type: String, required: true },      // e.g. "กุมภาพันธ์ 2024"
+  company: { type: String, enum: ['บริษัทพัฒนา', 'บริษัทTotal'], required: true },
 
   // รายได้
   baseSalary: { type: Number, default: 0 },
@@ -32,7 +33,7 @@ const payrollRecordSchema = new mongoose.Schema({
   calculatedAt: { type: Date },
 }, { timestamps: true });
 
-// Compound index: one record per employee per period
-payrollRecordSchema.index({ employee: 1, period: 1 }, { unique: true });
+// Compound index: one record per employee per period per company
+payrollRecordSchema.index({ employee: 1, period: 1, company: 1 }, { unique: true });
 
 module.exports = mongoose.model('PayrollRecord', payrollRecordSchema);

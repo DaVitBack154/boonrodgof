@@ -47,9 +47,24 @@ async function seed() {
       return ids;
     };
 
-    const getEmpType = (companyStr) => {
-      if (companyStr.includes('พาร์ทไทม์')) return 'parttime';
-      return 'fulltime';
+    const parseCompanies = (companyStr) => {
+      if (companyStr === 'กรรมการบริษัท') {
+        return [
+          { company: 'บริษัทพัฒนา', employmentType: 'fulltime' },
+          { company: 'บริษัทTotal', employmentType: 'fulltime' },
+        ];
+      }
+      const parts = companyStr.split(',').map(s => s.trim());
+      if (parts.length === 2) {
+        return [
+          { company: 'บริษัทพัฒนา', employmentType: parts[0].includes('พาร์ทไทม์') ? 'parttime' : 'fulltime' },
+          { company: 'บริษัทTotal', employmentType: parts[1].includes('พาร์ทไทม์') ? 'parttime' : 'fulltime' },
+        ];
+      }
+      // single company
+      return [
+        { company: 'บริษัทพัฒนา', employmentType: parts[0].includes('พาร์ทไทม์') ? 'parttime' : 'fulltime' },
+      ];
     };
 
     const excelData = [
@@ -83,8 +98,10 @@ async function seed() {
       const firstNameTh = parts[0];
       const lastNameTh = parts.slice(1).join(' ') || '-';
       
-      const empType = getEmpType(data.company);
+      const companies = parseCompanies(data.company);
       const branchIds = getBranchIds(data.branch);
+      // employmentType ใช้จาก company แรก (backward compat)
+      const empType = companies[0].employmentType;
 
       let department = 'ผู้ฝึกสอน';
       let position = 'Coach';
@@ -106,6 +123,7 @@ async function seed() {
         email: data.email,
         phone: data.phone,
         branch: branchIds,
+        companies,
         department,
         position,
         employmentType: empType,

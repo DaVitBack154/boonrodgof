@@ -34,6 +34,11 @@ import {
   InputGroup,
   InputLeftAddon,
   Tooltip,
+  Tabs,
+  TabList,
+  Tab,
+  TabPanels,
+  TabPanel,
 } from "@chakra-ui/react";
 import {
   Calculator,
@@ -58,6 +63,21 @@ import dayjs from "dayjs";
 import "dayjs/locale/th";
 
 dayjs.locale("th");
+
+const THAI_MONTHS = [
+  "มกราคม",
+  "กุมภาพันธ์",
+  "มีนาคม",
+  "เมษายน",
+  "พฤษภาคม",
+  "มิถุนายน",
+  "กรกฎาคม",
+  "สิงหาคม",
+  "กันยายน",
+  "ตุลาคม",
+  "พฤศจิกายน",
+  "ธันวาคม",
+];
 
 const fmt = (n) =>
   (n || 0).toLocaleString("th-TH", {
@@ -113,11 +133,14 @@ const CommissionDetailModal = ({
   }, [isOpen, coachId, period]);
 
   const totalCom = details.reduce((sum, item) => {
-    return sum + (item.studentCourse?.commissionPerLesson || 0);
+    if (!item.studentCourse) return sum;
+    const lessonRate = item.commissionRate != null ? item.commissionRate : (item.studentCourse?.commissionRate || 0);
+    const perLessonRate = item.studentCourse?.perLessonRate || 0;
+    return sum + Math.round((perLessonRate * lessonRate / 100) * 100) / 100;
   }, 0);
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="3xl">
+    <Modal isOpen={isOpen} onClose={onClose} size="4xl">
       <ModalOverlay />
       <ModalContent borderRadius="2xl">
         <ModalHeader
@@ -148,29 +171,48 @@ const CommissionDetailModal = ({
               <Table variant="simple" size="sm">
                 <Thead bg="gray.50">
                   <Tr>
-                    <Th>วันที่สอน</Th>
+                    <Th>วันที่/เวลา</Th>
                     <Th>ลูกค้า</Th>
-                    <Th isNumeric>ราคาคอร์ส</Th>
-                    <Th isNumeric>จำนวนครั้ง</Th>
+                    <Th>ครั้งที่</Th>
+                    <Th isNumeric>RATE (%)</Th>
+                    <Th>สาขา</Th>
+                    <Th>บริษัท</Th>
                     <Th isNumeric>ค่าคอม/ครั้ง</Th>
                   </Tr>
                 </Thead>
                 <Tbody>
-                  {details.map((item, idx) => (
-                    <Tr key={item._id} _hover={{ bg: "gray.50" }}>
-                      <Td>{dayjs(item.lessonDate).format("DD MMM YYYY")}</Td>
-                      <Td>{item.studentCourse?.studentName || "-"}</Td>
-                      <Td isNumeric>{fmt(item.studentCourse?.packagePrice)}</Td>
-                      <Td isNumeric>{item.studentCourse?.totalLessons}</Td>
-                      <Td isNumeric fontWeight="bold" color="green.600">
-                        {fmt(item.studentCourse?.commissionPerLesson)}
-                      </Td>
-                    </Tr>
-                  ))}
+                  {details.map((item) => {
+                    const lessonRate = item.commissionRate != null ? item.commissionRate : (item.studentCourse?.commissionRate || 0);
+                    const perLessonRate = item.studentCourse?.perLessonRate || 0;
+                    const comPerLesson = Math.round((perLessonRate * lessonRate / 100) * 100) / 100;
+                    return (
+                      <Tr key={item._id} _hover={{ bg: "gray.50" }}>
+                        <Td>{dayjs(item.lessonDate).format("DD MMM YYYY HH:mm")}</Td>
+                        <Td>{item.studentCourse?.studentName || "-"}</Td>
+                        <Td>{item.lessonNumber}/{item.studentCourse?.totalLessons}</Td>
+                        <Td isNumeric>{lessonRate}%</Td>
+                        <Td fontSize="xs">{item.branch?.name || "-"}</Td>
+                        <Td>
+                          <Badge
+                            colorScheme={item.studentCourse?.company === 'บริษัทTotal' ? 'purple' : 'teal'}
+                            variant="subtle"
+                            borderRadius="full"
+                            px="2"
+                            fontSize="xx-small"
+                          >
+                            {item.studentCourse?.company || "-"}
+                          </Badge>
+                        </Td>
+                        <Td isNumeric fontWeight="bold" color="green.600">
+                          {fmt(comPerLesson)}
+                        </Td>
+                      </Tr>
+                    );
+                  })}
                 </Tbody>
                 <Tfoot bg="green.50">
                   <Tr>
-                    <Th colSpan={4} textAlign="right" py="3">
+                    <Th colSpan={6} textAlign="right" py="3">
                       รวมค่าคอมมิชชั่น
                     </Th>
                     <Th
@@ -426,6 +468,7 @@ const Payroll = () => {
   const [selectedCoachForCom, setSelectedCoachForCom] = useState(null);
   const [records, setRecords] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [companyFilter, setCompanyFilter] = useState("");
   const [loading, setLoading] = useState(false);
   const [calculating, setCalculating] = useState(false);
   const [period, setPeriod] = useState(() => {
@@ -509,7 +552,12 @@ const Payroll = () => {
     }
   };
 
-  const totals = records.reduce(
+  const tabRecords = useMemo(() => {
+    if (!companyFilter) return records;
+    return records.filter((r) => r.company === companyFilter);
+  }, [records, companyFilter]);
+
+  const totals = tabRecords.reduce(
     (acc, r) => ({
       totalIncome: acc.totalIncome + (r.totalIncome || 0),
       totalDeductions: acc.totalDeductions + (r.totalDeductions || 0),
@@ -519,9 +567,9 @@ const Payroll = () => {
   );
 
   const filteredRecords = useMemo(() => {
-    if (!searchTerm) return records;
+    if (!searchTerm) return tabRecords;
     const lower = searchTerm.toLowerCase();
-    return records.filter((r) => {
+    return tabRecords.filter((r) => {
       const emp = r.employee;
       if (!emp) return false;
       return (
@@ -531,11 +579,114 @@ const Payroll = () => {
         emp.employeeId?.toLowerCase().includes(lower)
       );
     });
-  }, [records, searchTerm]);
+  }, [tabRecords, searchTerm]);
+
+  // Period label showing 26-25 range
+  const periodLabel = useMemo(() => {
+    if (!period) return "";
+    const [y, m] = period.split("-");
+    const prevMonth = parseInt(m) - 1 === 0 ? 12 : parseInt(m) - 1;
+    const prevYear = parseInt(m) - 1 === 0 ? parseInt(y) - 1 : parseInt(y);
+    const THAI_MONTHS = [
+      "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน",
+      "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม",
+      "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
+    ];
+    return `26 ${THAI_MONTHS[prevMonth - 1].slice(0, 3)} ${prevYear} - 25 ${THAI_MONTHS[parseInt(m) - 1].slice(0, 3)} ${y}`;
+  }, [period]);
+
+  // Export CSV
+  const exportToCSV = () => {
+    if (!filteredRecords || filteredRecords.length === 0) {
+      toast({ title: "ไม่มีข้อมูลสำหรับ Export", status: "warning", duration: 2000 });
+      return;
+    }
+
+    // CSV Header
+    let csvContent = "\uFEFF"; // BOM for UTF-8
+    csvContent += "พนักงาน,ประเภท,บริษัท,เงินเดือน,ค่าคอม,SALE,รวมรายได้,ภงด.1,สปส.,หักอื่นๆ,รวมหัก,ยอดสุทธิ\n";
+
+    // Rows
+    filteredRecords.forEach((r) => {
+      const empName = r.employee ? `${r.employee.firstNameTh} ${r.employee.lastNameTh} ${r.employee.nickname ? `(${r.employee.nickname})` : ""}` : "ไม่ทราบชื่อ";
+      const empType = r.employmentType === "fulltime" ? "ประจำ" : "Part-time";
+      const company = r.company || "-";
+      const baseSalary = r.baseSalary || 0;
+      const commission = r.commissionAmount || 0;
+      const salesBonus = r.salesBonus || 0;
+      const totalIncome = r.totalIncome || 0;
+      
+      const tax = r.employmentType === "fulltime" ? (r.withholdingTax || 0) : (r.parttimeWithholding || 0);
+      const sso = r.employmentType === "fulltime" ? (r.socialSecurity || 0) : 0;
+      const otherDeduct = r.otherDeductions || 0;
+      const totalDeduct = r.totalDeductions || 0;
+      const netPay = r.netPay || 0;
+
+      const row = [
+        `"${empName}"`,
+        `"${empType}"`,
+        `"${company}"`,
+        baseSalary,
+        commission,
+        salesBonus,
+        totalIncome,
+        tax,
+        sso,
+        otherDeduct,
+        totalDeduct,
+        netPay
+      ];
+      csvContent += row.join(",") + "\n";
+    });
+
+    // Totals Row
+    let totalBase = 0, totalCom = 0, totalSale = 0, sumIncome = 0;
+    let totalTax = 0, totalSso = 0, totalOtherDeduct = 0, sumDeduct = 0, sumNet = 0;
+
+    filteredRecords.forEach(r => {
+      totalBase += r.baseSalary || 0;
+      totalCom += r.commissionAmount || 0;
+      totalSale += r.salesBonus || 0;
+      sumIncome += r.totalIncome || 0;
+      totalTax += r.employmentType === "fulltime" ? (r.withholdingTax || 0) : (r.parttimeWithholding || 0);
+      totalSso += r.employmentType === "fulltime" ? (r.socialSecurity || 0) : 0;
+      totalOtherDeduct += r.otherDeductions || 0;
+      sumDeduct += r.totalDeductions || 0;
+      sumNet += r.netPay || 0;
+    });
+
+    const totalRow = [
+      `"ยอดรวมทั้งหมด"`,
+      `""`,
+      `""`,
+      totalBase,
+      totalCom,
+      totalSale,
+      sumIncome,
+      totalTax,
+      totalSso,
+      totalOtherDeduct,
+      sumDeduct,
+      sumNet
+    ];
+    csvContent += totalRow.join(",") + "\n";
+
+    // Create Blob and trigger download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    // Determine the active tab name from the companyFilter (empty means "All")
+    const tabName = companyFilter === "" ? "รวมทั้งหมด" : companyFilter;
+    link.setAttribute("download", `payroll_${period}_${tabName}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // Generate month options (last 12 months)
   const monthOptions = [];
-  const THAI_MONTHS = [
+  const MONTHS_LABEL = [
     "มกราคม",
     "กุมภาพันธ์",
     "มีนาคม",
@@ -553,7 +704,7 @@ const Payroll = () => {
     const d = new Date();
     d.setMonth(d.getMonth() - i);
     const val = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    const label = `${THAI_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+    const label = `${MONTHS_LABEL[d.getMonth()]} ${d.getFullYear()}`;
     monthOptions.push({ value: val, label });
   }
 
@@ -592,16 +743,65 @@ const Payroll = () => {
         </HStack>
       </Flex>
 
-      {/* Filters */}
-      <Box
-        bg="white"
-        p="5"
-        borderRadius="2xl"
-        boxShadow="sm"
-        borderWidth="1px"
-        borderColor="gray.100"
-        mb="6"
+      {/* Company Tabs and Enclosed Content */}
+      <Tabs
+        index={companyFilter === "บริษัทพัฒนา" ? 0 : companyFilter === "บริษัทTotal" ? 1 : 2}
+        onChange={(index) => {
+          const companies = ["บริษัทพัฒนา", "บริษัทTotal", ""];
+          setCompanyFilter(companies[index]);
+        }}
+        variant="enclosed"
+        colorScheme="brand"
       >
+        <TabList mb="-1px" borderBottomColor="gray.200">
+          <Tab
+            bg="gray.50"
+            color="gray.500"
+            _selected={{ color: "brand.700", bg: "white", borderTop: "3px solid", borderTopColor: "brand.600", borderBottomColor: "white", fontWeight: "bold" }}
+            fontWeight="semibold"
+            px="8"
+            py="3"
+            borderTopRadius="xl"
+          >
+            บริษัทพัฒนา
+          </Tab>
+          <Tab
+            bg="gray.50"
+            color="gray.500"
+            _selected={{ color: "brand.700", bg: "white", borderTop: "3px solid", borderTopColor: "brand.600", borderBottomColor: "white", fontWeight: "bold" }}
+            fontWeight="semibold"
+            px="8"
+            py="3"
+            borderTopRadius="xl"
+            ml="1"
+          >
+            บริษัทTotal
+          </Tab>
+          <Tab
+            bg="gray.50"
+            color="gray.500"
+            _selected={{ color: "brand.700", bg: "white", borderTop: "3px solid", borderTopColor: "brand.600", borderBottomColor: "white", fontWeight: "bold" }}
+            fontWeight="semibold"
+            px="8"
+            py="3"
+            borderTopRadius="xl"
+            ml="1"
+          >
+            ยอดรวมทั้งหมด
+          </Tab>
+        </TabList>
+
+        <Box
+          bg="white"
+          borderWidth="1px"
+          borderColor="gray.200"
+          borderBottomRadius="xl"
+          borderTopRightRadius="xl"
+          p={{ base: 4, md: 6 }}
+          boxShadow="sm"
+        >
+          {/* Filters Inside Tabs */}
+          <Box mb="8">
         <Flex
           gap="4"
           flexWrap="wrap"
@@ -639,37 +839,50 @@ const Payroll = () => {
             <Box>
               <Text fontSize="xs" color="gray.400">
                 {records.length > 0
-                  ? `แสดง ${filteredRecords.length} คน | ประจำ ${filteredRecords.filter((r) => r.employmentType === "fulltime").length} | Part-time ${filteredRecords.filter((r) => r.employmentType === "parttime").length}`
-                  : "ยังไม่มีข้อมูลงวดนี้ กดปุ่ม 'ประมวลผลเงินเดือน' เพื่อคำนวณ"}
+                  ? `แสดง ${filteredRecords.length} รายการ | ประจำ ${filteredRecords.filter((r) => r.employmentType === "fulltime").length} | Part-time ${filteredRecords.filter((r) => r.employmentType === "parttime").length}`
+                  : "ยังไม่มีข้อมูลงวดนี้"}
+              </Text>
+              <Text fontSize="xs" color="blue.500" fontWeight="semibold">
+                รอบบิล: {periodLabel}
               </Text>
             </Box>
           </Flex>
-          <Box w={{ base: "100%", md: "300px" }}>
-            <InputGroup size="sm">
-              <InputLeftAddon bg="gray.50" border="none">
-                <Search size="14" />
-              </InputLeftAddon>
-              <Input
-                placeholder="ค้นหาชื่อ, นามสกุล, ชื่อเล่น..."
-                bg="gray.50"
-                border="none"
-                borderRadius="lg"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                _focus={{
-                  bg: "white",
-                  borderWidth: "1px",
-                  borderColor: "brand.300",
-                }}
-              />
-            </InputGroup>
-          </Box>
+            <Flex gap="3" w={{ base: "100%", md: "auto" }}>
+              <InputGroup size="sm" w={{ base: "100%", md: "250px" }}>
+                <InputLeftAddon bg="gray.50" border="none">
+                  <Search size="14" />
+                </InputLeftAddon>
+                <Input
+                  placeholder="ค้นหาชื่อ, นามสกุล, ชื่อเล่น..."
+                  bg="gray.50"
+                  border="none"
+                  borderRadius="lg"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  _focus={{
+                    bg: "white",
+                    borderWidth: "1px",
+                    borderColor: "brand.300",
+                  }}
+                />
+              </InputGroup>
+              <Button
+                size="sm"
+                leftIcon={<Download size={16} />}
+                colorScheme="green"
+                variant="outline"
+                onClick={exportToCSV}
+                isDisabled={filteredRecords.length === 0}
+              >
+                Export CSV
+              </Button>
+            </Flex>
         </Flex>
       </Box>
 
       {/* Summary Cards */}
-      <SimpleGrid columns={{ base: 1, md: 3 }} spacing="5" mb="8">
-        <Box
+      <SimpleGrid columns={{ base: 1, md: 3 }} spacing="6" mb="8">
+            <Box
           p="6"
           bg="white"
           borderRadius="2xl"
@@ -769,6 +982,9 @@ const Payroll = () => {
                   </Th>
                   <Th py="4" color="gray.500" fontSize="xs" fontWeight="bold">
                     ประเภท
+                  </Th>
+                  <Th py="4" color="gray.500" fontSize="xs" fontWeight="bold">
+                    บริษัท
                   </Th>
                   <Th
                     py="4"
@@ -908,6 +1124,17 @@ const Payroll = () => {
                           fontSize="xs"
                         >
                           {isParttime ? "Part-time" : "ประจำ"}
+                        </Badge>
+                      </Td>
+                      <Td py="4">
+                        <Badge
+                          colorScheme={record.company === 'บริษัทTotal' ? 'purple' : 'teal'}
+                          variant="subtle"
+                          borderRadius="full"
+                          px="2"
+                          fontSize="xx-small"
+                        >
+                          {record.company || "-"}
                         </Badge>
                       </Td>
                       <Td
@@ -1092,13 +1319,13 @@ const Payroll = () => {
               <Tfoot bg="gray.50">
                 <Tr>
                   <Th
-                    colSpan={3}
+                    colSpan={4}
                     py="4"
                     fontSize="sm"
                     fontWeight="bold"
                     color="gray.700"
                   >
-                    รวมทั้งหมด ({records.length} คน)
+                    รวมทั้งหมด ({filteredRecords.length} รายการ)
                   </Th>
                   <Th
                     py="4"
@@ -1135,6 +1362,8 @@ const Payroll = () => {
           </Box>
         )}
       </Box>
+      </Box> {/* Close Tab Content Wrapper Box */}
+      </Tabs> {/* Close Tabs */}
 
       {/* Detail Drawer */}
       <PayrollDetailDrawer

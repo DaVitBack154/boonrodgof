@@ -13,13 +13,13 @@ const THAI_MONTHS = [
 ];
 
 /**
- * คำนวณค่าคอมมิชชั่นของโค้ชแต่ละคน ตามงวดเดือน
+ * คำนวณค่าคอมมิชชั่นของโค้ชแต่ละคน ตามงวดเดือน แยกตามบริษัท
  */
-async function getCoachCommission(coachId, period) {
+async function getCoachCommission(coachId, period, company) {
   const [year, month] = period.split('-');
   
-  // start = 25th of previous month
-  const startDate = new Date(year, parseInt(month) - 2, 25);
+  // start = 26th of previous month
+  const startDate = new Date(year, parseInt(month) - 2, 26);
   startDate.setHours(0, 0, 0, 0);
 
   // end = 25th of current month
@@ -30,11 +30,15 @@ async function getCoachCommission(coachId, period) {
     coach: coachId,
     lessonDate: { $gte: startDate, $lte: endDate },
     status: 'completed',
-  }).populate('studentCourse', 'commissionPerLesson perLessonRate commissionRate studentName');
+  }).populate('studentCourse', 'commissionPerLesson perLessonRate commissionRate studentName company');
 
   let total = 0;
   for (const lesson of lessons) {
     if (lesson.studentCourse) {
+      // กรอง commission เฉพาะบริษัทที่ระบุ
+      const courseCompany = lesson.studentCourse.company || '';
+      if (company && courseCompany !== company) continue;
+      
       const lessonRate = lesson.commissionRate != null ? lesson.commissionRate : (lesson.studentCourse.commissionRate || 0);
       const perLessonRate = lesson.studentCourse.perLessonRate || 0;
       total += Math.round((perLessonRate * lessonRate / 100) * 100) / 100;
@@ -62,7 +66,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /api/payroll/calculate - คำนวณเงินเดือนทั้งงวด (รวมค่าคอม)
+// POST /api/payroll/calculate - คำนวณเงินเดือนทั้งงวด (รวมค่าคอม แยกตามบริษัท)
 router.post('/calculate', async (req, res) => {
   try {
     const { period } = req.body;
@@ -77,34 +81,66 @@ router.post('/calculate', async (req, res) => {
     const results = [];
 
     for (const emp of employees) {
-      let existing = await PayrollRecord.findOne({ employee: emp._id, period });
-      const existingOtherDeductions = existing ? existing.otherDeductions : 0;
-      const existingSalesBonus = existing ? existing.salesBonus : 0;
+      // กำหนดรายชื่อบริษัทที่พนักงานอยู่
+      const companyList = emp.companies && emp.companies.length > 0
+        ? emp.companies
+        : [{ company: 'บริษัทพัฒนา', employmentType: emp.employmentType || 'fulltime' }];
 
-      // คำนวณค่าคอมจาก lesson records
-      const commissionAmount = await getCoachCommission(emp._id, period);
-      
-      // คำนวณ payroll (รวมค่าคอม + sale)
-      const calc = calculatePayroll(emp, existingOtherDeductions, commissionAmount, existingSalesBonus);
+      // track ว่าจ่าย baseSalary ไปหรือยัง (จ่ายเฉพาะบริษัทแรก)
+      let baseSalaryPaid = false;
 
-      if (existing) {
-        Object.assign(existing, calc, { 
-          period, periodLabel, 
-          status: 'calculated',
-          calculatedAt: new Date()
+      for (const companyInfo of companyList) {
+        const companyName = companyInfo.company;
+        const compEmpType = companyInfo.employmentType || 'fulltime';
+
+        let existing = await PayrollRecord.findOne({ 
+          employee: emp._id, period, company: companyName 
         });
-        await existing.save();
-        results.push(existing);
-      } else {
-        const record = new PayrollRecord({
-          employee: emp._id,
-          period, periodLabel,
-          ...calc,
-          status: 'calculated',
-          calculatedAt: new Date(),
-        });
-        await record.save();
-        results.push(record);
+        const existingOtherDeductions = existing ? existing.otherDeductions : 0;
+        const existingSalesBonus = existing ? existing.salesBonus : 0;
+
+        // คำนวณค่าคอมจาก lesson records เฉพาะบริษัทนี้
+        const commissionAmount = await getCoachCommission(emp._id, period, companyName);
+        
+        // เงินเดือนฐานจ่ายเฉพาะบริษัทแรกที่เป็นประจำ (หรือบริษัทแรก)
+        const shouldPayBase = !baseSalaryPaid && (compEmpType === 'fulltime' || companyList.length === 1);
+        
+        // สร้าง employee object จำลองเพื่อส่งเข้า calculator
+        const empForCalc = {
+          ...emp.toObject(),
+          employmentType: compEmpType,
+          // ถ้าไม่จ่าย baseSalary จากบริษัทนี้ ให้ set = 0
+          baseSalary: shouldPayBase ? emp.baseSalary : 0,
+          livingAllowance: shouldPayBase ? emp.livingAllowance : 0,
+          positionAllowance: shouldPayBase ? emp.positionAllowance : 0,
+          professionalAllowance: shouldPayBase ? emp.professionalAllowance : 0,
+        };
+
+        if (shouldPayBase) baseSalaryPaid = true;
+
+        // คำนวณ payroll (รวมค่าคอม + sale)
+        const calc = calculatePayroll(empForCalc, existingOtherDeductions, commissionAmount, existingSalesBonus);
+
+        if (existing) {
+          Object.assign(existing, calc, { 
+            period, periodLabel, company: companyName,
+            status: 'calculated',
+            calculatedAt: new Date()
+          });
+          await existing.save();
+          results.push(existing);
+        } else {
+          const record = new PayrollRecord({
+            employee: emp._id,
+            period, periodLabel,
+            company: companyName,
+            ...calc,
+            status: 'calculated',
+            calculatedAt: new Date(),
+          });
+          await record.save();
+          results.push(record);
+        }
       }
     }
 
@@ -115,7 +151,7 @@ router.post('/calculate', async (req, res) => {
       });
 
     res.json({
-      message: `คำนวณเงินเดือนงวด ${periodLabel} เรียบร้อย (${results.length} คน)`,
+      message: `คำนวณเงินเดือนงวด ${periodLabel} เรียบร้อย (${results.length} รายการ)`,
       records: populated,
     });
   } catch (err) {
@@ -199,8 +235,8 @@ router.get('/commission-summary', async (req, res) => {
       endDate = new Date(year, parseInt(month), 0); // last day of month
       endDate.setHours(23, 59, 59, 999);
     } else {
-      // Normal: 25th of previous month to 25th of current month
-      startDate = new Date(year, parseInt(month) - 2, 25);
+      // Normal: 26th of previous month to 25th of current month
+      startDate = new Date(year, parseInt(month) - 2, 26);
       startDate.setHours(0, 0, 0, 0);
       endDate = new Date(year, parseInt(month) - 1, 25);
       endDate.setHours(23, 59, 59, 999);
@@ -274,7 +310,7 @@ router.get('/commission-details', async (req, res) => {
     }
 
     const [year, month] = period.split('-');
-    const startDate = new Date(year, parseInt(month) - 2, 25);
+    const startDate = new Date(year, parseInt(month) - 2, 26);
     startDate.setHours(0, 0, 0, 0);
 
     const endDate = new Date(year, parseInt(month) - 1, 25);

@@ -115,12 +115,12 @@ const MonthlyCommission = () => {
     return sum + Math.round(((perLessonRate * lessonRate) / 100) * 100) / 100;
   }, 0);
 
-  // Period label showing 25-25 range
+  // Period label showing 26-25 range
   const periodLabel = (() => {
     const [y, m] = period.split("-");
     const prevMonth = parseInt(m) - 1 === 0 ? 12 : parseInt(m) - 1;
     const prevYear = parseInt(m) - 1 === 0 ? parseInt(y) - 1 : parseInt(y);
-    return `25 ${THAI_MONTHS[prevMonth - 1].slice(0, 3)} ${prevYear} - 25 ${THAI_MONTHS[parseInt(m) - 1].slice(0, 3)} ${y}`;
+    return `26 ${THAI_MONTHS[prevMonth - 1].slice(0, 3)} ${prevYear} - 25 ${THAI_MONTHS[parseInt(m) - 1].slice(0, 3)} ${y}`;
   })();
 
   // Fetch uncounted lessons (after 25th of current month)
