@@ -1,0 +1,320 @@
+const express = require('express');
+const router = express.Router();
+const Employee = require('../models/Employee');
+const PayrollRecord = require('../models/PayrollRecord');
+const LessonRecord = require('../models/LessonRecord');
+const { calculatePayroll } = require('../utils/payrollCalculator');
+
+// Thai month names for labels
+const THAI_MONTHS = [
+  'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน',
+  'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม',
+  'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+];
+
+/**
+ * คำนวณค่าคอมมิชชั่นของโค้ชแต่ละคน ตามงวดเดือน
+ */
+async function getCoachCommission(coachId, period) {
+  const [year, month] = period.split('-');
+  
+  // start = 25th of previous month
+  const startDate = new Date(year, parseInt(month) - 2, 25);
+  startDate.setHours(0, 0, 0, 0);
+
+  // end = 25th of current month
+  const endDate = new Date(year, parseInt(month) - 1, 25);
+  endDate.setHours(23, 59, 59, 999);
+
+  const lessons = await LessonRecord.find({
+    coach: coachId,
+    lessonDate: { $gte: startDate, $lte: endDate },
+    status: 'completed',
+  }).populate('studentCourse', 'commissionPerLesson perLessonRate commissionRate studentName');
+
+  let total = 0;
+  for (const lesson of lessons) {
+    if (lesson.studentCourse) {
+      const lessonRate = lesson.commissionRate != null ? lesson.commissionRate : (lesson.studentCourse.commissionRate || 0);
+      const perLessonRate = lesson.studentCourse.perLessonRate || 0;
+      total += Math.round((perLessonRate * lessonRate / 100) * 100) / 100;
+    }
+  }
+  return Math.round(total * 100) / 100;
+}
+
+// GET /api/payroll?period=2024-02 - ดึง payroll records ตามงวด
+router.get('/', async (req, res) => {
+  try {
+    const { period } = req.query;
+    if (!period) return res.status(400).json({ error: 'กรุณาระบุงวดเงินเดือน (period)' });
+
+    const records = await PayrollRecord.find({ period })
+      .populate({
+        path: 'employee',
+        populate: { path: 'branch', select: 'name code type' }
+      })
+      .sort('employee.employeeId');
+    
+    res.json(records);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/payroll/calculate - คำนวณเงินเดือนทั้งงวด (รวมค่าคอม)
+router.post('/calculate', async (req, res) => {
+  try {
+    const { period } = req.body;
+    if (!period) return res.status(400).json({ error: 'กรุณาระบุงวดเงินเดือน (period)' });
+
+    const [year, month] = period.split('-');
+    const monthIndex = parseInt(month) - 1;
+    const periodLabel = `${THAI_MONTHS[monthIndex]} ${year}`;
+
+    const employees = await Employee.find({ status: { $in: ['active', 'probation'] } });
+    
+    const results = [];
+
+    for (const emp of employees) {
+      let existing = await PayrollRecord.findOne({ employee: emp._id, period });
+      const existingOtherDeductions = existing ? existing.otherDeductions : 0;
+      const existingSalesBonus = existing ? existing.salesBonus : 0;
+
+      // คำนวณค่าคอมจาก lesson records
+      const commissionAmount = await getCoachCommission(emp._id, period);
+      
+      // คำนวณ payroll (รวมค่าคอม + sale)
+      const calc = calculatePayroll(emp, existingOtherDeductions, commissionAmount, existingSalesBonus);
+
+      if (existing) {
+        Object.assign(existing, calc, { 
+          period, periodLabel, 
+          status: 'calculated',
+          calculatedAt: new Date()
+        });
+        await existing.save();
+        results.push(existing);
+      } else {
+        const record = new PayrollRecord({
+          employee: emp._id,
+          period, periodLabel,
+          ...calc,
+          status: 'calculated',
+          calculatedAt: new Date(),
+        });
+        await record.save();
+        results.push(record);
+      }
+    }
+
+    const populated = await PayrollRecord.find({ period })
+      .populate({
+        path: 'employee',
+        populate: { path: 'branch', select: 'name code type' }
+      });
+
+    res.json({
+      message: `คำนวณเงินเดือนงวด ${periodLabel} เรียบร้อย (${results.length} คน)`,
+      records: populated,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/payroll/:id/deductions - HR กรอกหักอื่นๆ
+router.put('/:id/deductions', async (req, res) => {
+  try {
+    const { otherDeductions } = req.body;
+    const record = await PayrollRecord.findById(req.params.id);
+    if (!record) return res.status(404).json({ error: 'ไม่พบข้อมูล payroll' });
+
+    record.otherDeductions = otherDeductions || 0;
+
+    if (record.employmentType === 'parttime') {
+      record.totalDeductions = record.parttimeWithholding;
+    } else {
+      record.totalDeductions = record.withholdingTax + record.socialSecurity + record.otherDeductions;
+    }
+    record.netPay = Math.round((record.totalIncome - record.totalDeductions) * 100) / 100;
+
+    await record.save();
+
+    const populated = await PayrollRecord.findById(record._id)
+      .populate({
+        path: 'employee',
+        populate: { path: 'branch', select: 'name code type' }
+      });
+
+    res.json(populated);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// PUT /api/payroll/:id/sales-bonus - HR กรอก Sale Bonus
+router.put('/:id/sales-bonus', async (req, res) => {
+  try {
+    const { salesBonus } = req.body;
+    const record = await PayrollRecord.findById(req.params.id);
+    if (!record) return res.status(404).json({ error: 'ไม่พบข้อมูล payroll' });
+
+    const employee = await Employee.findById(record.employee);
+    if (!employee) return res.status(404).json({ error: 'ไม่พบข้อมูลพนักงาน' });
+
+    // Recalculate with updated sales bonus
+    const calc = calculatePayroll(employee, record.otherDeductions, record.commissionAmount, salesBonus || 0);
+    Object.assign(record, calc);
+    record.calculatedAt = new Date();
+    await record.save();
+
+    const populated = await PayrollRecord.findById(record._id)
+      .populate({
+        path: 'employee',
+        populate: { path: 'branch', select: 'name code type' }
+      });
+
+    res.json(populated);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// GET /api/payroll/commission-summary - สรุปค่าคอมโค้ชทุกคน
+router.get('/commission-summary', async (req, res) => {
+  try {
+    const { period } = req.query;
+    if (!period) return res.status(400).json({ error: 'กรุณาระบุ period (YYYY-MM)' });
+
+    let startDate, endDate;
+    const isUncounted = period.endsWith('-uncounted');
+    const basePeriod = isUncounted ? period.replace('-uncounted', '') : period;
+    const [year, month] = basePeriod.split('-');
+
+    if (isUncounted) {
+      // After 25th of current month to end of month
+      startDate = new Date(year, parseInt(month) - 1, 26);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(year, parseInt(month), 0); // last day of month
+      endDate.setHours(23, 59, 59, 999);
+    } else {
+      // Normal: 25th of previous month to 25th of current month
+      startDate = new Date(year, parseInt(month) - 2, 25);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(year, parseInt(month) - 1, 25);
+      endDate.setHours(23, 59, 59, 999);
+    }
+
+    // ดึงโค้ชทั้งหมด (หรือเฉพาะ coachId ที่ส่งมา)
+    const { coachId } = req.query;
+    const query = {
+      department: { $in: ['ผู้ฝึกสอน', 'ผู้ช่วยฝึกสอน'] },
+      status: { $in: ['active', 'probation'] },
+    };
+    if (coachId) {
+      query._id = coachId;
+    }
+
+    const coaches = await Employee.find(query)
+      .select('employeeId firstNameTh lastNameTh nickname department position branch')
+      .populate('branch', 'name code');
+
+    const result = [];
+
+    for (const coach of coaches) {
+      const lessons = await LessonRecord.find({
+        coach: coach._id,
+        lessonDate: { $gte: startDate, $lte: endDate },
+        status: 'completed',
+      }).populate('studentCourse', 'commissionPerLesson perLessonRate commissionRate studentName company totalLessons')
+        .populate('branch', 'name code');
+
+      let totalCommission = 0;
+      for (const lesson of lessons) {
+        if (lesson.studentCourse) {
+          const lessonRate = lesson.commissionRate != null ? lesson.commissionRate : (lesson.studentCourse.commissionRate || 0);
+          const perLessonRate = lesson.studentCourse.perLessonRate || 0;
+          totalCommission += Math.round((perLessonRate * lessonRate / 100) * 100) / 100;
+        }
+      }
+
+      result.push({
+        coach,
+        lessonsCount: lessons.length,
+        totalCommission: Math.round(totalCommission * 100) / 100,
+      });
+    }
+
+    // เรียงตามค่าคอมมากไปน้อย
+    result.sort((a, b) => b.totalCommission - a.totalCommission);
+
+    const grandTotal = result.reduce((sum, r) => sum + r.totalCommission, 0);
+    const totalLessons = result.reduce((sum, r) => sum + r.lessonsCount, 0);
+
+    res.json({
+      coaches: result,
+      summary: {
+        totalCoaches: result.length,
+        totalLessons,
+        grandTotal: Math.round(grandTotal * 100) / 100,
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/payroll/commission-details - ดึงรายละเอียดค่าคอมโค้ช
+router.get('/commission-details', async (req, res) => {
+  try {
+    const { coachId, period } = req.query;
+    if (!coachId || !period) {
+      return res.status(400).json({ error: 'กรุณาระบุ coachId และ period' });
+    }
+
+    const [year, month] = period.split('-');
+    const startDate = new Date(year, parseInt(month) - 2, 25);
+    startDate.setHours(0, 0, 0, 0);
+
+    const endDate = new Date(year, parseInt(month) - 1, 25);
+    endDate.setHours(23, 59, 59, 999);
+
+    const lessons = await LessonRecord.find({
+      coach: coachId,
+      lessonDate: { $gte: startDate, $lte: endDate },
+      status: 'completed',
+    })
+      .populate({
+        path: 'studentCourse',
+        select: 'studentName packagePrice totalLessons commissionPerLesson commissionRate perLessonRate company',
+      })
+      .populate('branch', 'name code')
+      .sort('lessonDate');
+
+    res.json(lessons);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/payroll/periods
+router.get('/periods', async (req, res) => {
+  try {
+    const periods = await PayrollRecord.distinct('period');
+    const periodList = periods.map(p => {
+      const [year, month] = p.split('-');
+      const monthIndex = parseInt(month) - 1;
+      return {
+        value: p,
+        label: `${THAI_MONTHS[monthIndex]} ${year}`,
+      };
+    }).sort((a, b) => b.value.localeCompare(a.value));
+    
+    res.json(periodList);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+module.exports = router;
