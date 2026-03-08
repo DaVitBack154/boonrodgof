@@ -120,7 +120,7 @@ const MonthlyCommission = () => {
     const [y, m] = period.split("-");
     const prevMonth = parseInt(m) - 1 === 0 ? 12 : parseInt(m) - 1;
     const prevYear = parseInt(m) - 1 === 0 ? parseInt(y) - 1 : parseInt(y);
-    return `26 ${THAI_MONTHS[prevMonth - 1].slice(0, 3)} ${prevYear} - 25 ${THAI_MONTHS[parseInt(m) - 1].slice(0, 3)} ${y}`;
+    return `26 ${THAI_MONTHS[prevMonth - 1]} ${prevYear} - 25 ${THAI_MONTHS[parseInt(m) - 1]} ${y}`;
   })();
 
   // Fetch uncounted lessons (after 25th of current month)

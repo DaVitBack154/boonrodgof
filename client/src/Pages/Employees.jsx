@@ -54,7 +54,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   getEmployees,
   getBranches,
@@ -176,7 +176,9 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
         mb="4"
         onClick={onBack}
         leftIcon={<ChevronLeft size="16" />}
-        color="gray.600"
+        bg={"#021841"}
+        _hover={{ bg: "#021841" }}
+        color="#FFF"
       >
         กลับไปรายชื่อ
       </Button>
@@ -549,7 +551,7 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                     color="gray.600"
                     fontWeight="semibold"
                   >
-                    แผนก / ฝ่าย
+                    ตำแหน่ง
                   </FormLabel>
                   <Input
                     bg="gray.50"
@@ -881,9 +883,9 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
             ยกเลิก
           </Button>
           <Button
-            bg="brand.600"
+            bg="#021841"
             color="white"
-            _hover={{ bg: "brand.700" }}
+            _hover={{ bg: "#021841" }}
             borderRadius="lg"
             px="8"
             onClick={handleSubmit}
@@ -907,6 +909,7 @@ const Employees = () => {
   const [loading, setLoading] = useState(true);
   const [filterBranch, setFilterBranch] = useState("");
   const [filterType, setFilterType] = useState("");
+  const [companyFilter, setCompanyFilter] = useState("บริษัทพัฒนา");
   const [searchText, setSearchText] = useState("");
   const toast = useToast();
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -999,8 +1002,16 @@ const Employees = () => {
     );
   }
 
+  // Filter employees by company tab
+  const companyFiltered = useMemo(() => {
+    if (!companyFilter) return employees;
+    return employees.filter((e) =>
+      e.companies?.some((c) => c.company === companyFilter),
+    );
+  }, [employees, companyFilter]);
+
   // Filter employees by search text
-  const filtered = employees.filter((e) => {
+  const filtered = companyFiltered.filter((e) => {
     if (!searchText) return true;
     const s = searchText.toLowerCase();
     return (
@@ -1031,7 +1042,7 @@ const Employees = () => {
         </Box>
         <Button
           leftIcon={<Plus size="18" />}
-          bg="brand.600"
+          bg="#021841"
           color="white"
           _hover={{ bg: "brand.700" }}
           borderRadius="lg"
@@ -1043,326 +1054,405 @@ const Employees = () => {
         </Button>
       </Flex>
 
-      {/* Filters */}
-      <Box
-        bg="white"
-        p="5"
-        borderRadius="2xl"
-        boxShadow="sm"
-        borderWidth="1px"
-        borderColor="gray.100"
-        mb="6"
+      {/* Company Tabs */}
+      <Tabs
+        index={
+          companyFilter === "บริษัทพัฒนา"
+            ? 0
+            : companyFilter === "บริษัทTotal"
+              ? 1
+              : 2
+        }
+        onChange={(index) => {
+          const companies = ["บริษัทพัฒนา", "บริษัทTotal", ""];
+          setCompanyFilter(companies[index]);
+        }}
+        variant="enclosed"
+        colorScheme="brand"
       >
-        <Flex gap="4" flexWrap="wrap" alignItems="flex-end">
-          <Box flex="1" minW="200px">
-            <InputGroup size="sm">
-              <InputLeftElement>
-                <Search size="14" color="gray" />
-              </InputLeftElement>
-              <Input
-                placeholder="ค้นหาชื่อ, รหัส, ตำแหน่ง..."
+        <TabList mb="-1px" borderBottomColor="gray.200">
+          <Tab
+            bg="gray.50"
+            color="gray.500"
+            _selected={{
+              color: "brand.700",
+              bg: "white",
+              borderTop: "3px solid",
+              borderTopColor: "brand.600",
+              borderBottomColor: "white",
+              fontWeight: "bold",
+            }}
+            fontWeight="semibold"
+            px="8"
+            py="3"
+            borderTopRadius="xl"
+          >
+            บุญรอดกอล์ฟพัฒนา
+          </Tab>
+          <Tab
+            bg="gray.50"
+            color="gray.500"
+            _selected={{
+              color: "brand.700",
+              bg: "white",
+              borderTop: "3px solid",
+              borderTopColor: "brand.600",
+              borderBottomColor: "white",
+              fontWeight: "bold",
+            }}
+            fontWeight="semibold"
+            px="8"
+            py="3"
+            borderTopRadius="xl"
+            ml="1"
+          >
+            บุญรอดกอล์ฟโทเทิล
+          </Tab>
+          <Tab
+            bg="gray.50"
+            color="gray.500"
+            _selected={{
+              color: "brand.700",
+              bg: "white",
+              borderTop: "3px solid",
+              borderTopColor: "brand.600",
+              borderBottomColor: "white",
+              fontWeight: "bold",
+            }}
+            fontWeight="semibold"
+            px="8"
+            py="3"
+            borderTopRadius="xl"
+            ml="1"
+          >
+            ยอดรวมทั้งหมด
+          </Tab>
+        </TabList>
+
+        <Box
+          bg="white"
+          borderWidth="1px"
+          borderColor="gray.200"
+          borderBottomRadius="xl"
+          borderTopRightRadius="xl"
+          p={{ base: 4, md: 6 }}
+          boxShadow="sm"
+        >
+          {/* Filters */}
+          <Flex gap="4" flexWrap="wrap" alignItems="flex-end" mb="6">
+            <Box flex="1" minW="200px">
+              <InputGroup size="sm">
+                <InputLeftElement>
+                  <Search size="14" color="gray" />
+                </InputLeftElement>
+                <Input
+                  placeholder="ค้นหาชื่อ, รหัส, ตำแหน่ง..."
+                  bg="gray.50"
+                  border="none"
+                  borderRadius="lg"
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                />
+              </InputGroup>
+            </Box>
+            <Box>
+              <Text fontSize="xs" fontWeight="bold" color="gray.500" mb="1">
+                สาขา
+              </Text>
+              <Select
                 bg="gray.50"
                 border="none"
+                size="sm"
                 borderRadius="lg"
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-              />
-            </InputGroup>
-          </Box>
-          <Box>
-            <Text fontSize="xs" fontWeight="bold" color="gray.500" mb="1">
-              สาขา
-            </Text>
-            <Select
-              bg="gray.50"
-              border="none"
-              size="sm"
-              borderRadius="lg"
-              w="200px"
-              value={filterBranch}
-              onChange={(e) => setFilterBranch(e.target.value)}
-            >
-              <option value="">ทุกสาขา</option>
-              {branches.map((b) => (
-                <option key={b._id} value={b._id}>
-                  {b.name}
-                </option>
-              ))}
-            </Select>
-          </Box>
-          <Box>
-            <Text fontSize="xs" fontWeight="bold" color="gray.500" mb="1">
-              ประเภท
-            </Text>
-            <Select
-              bg="gray.50"
-              border="none"
-              size="sm"
-              borderRadius="lg"
-              w="160px"
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-            >
-              <option value="">ทั้งหมด</option>
-              <option value="fulltime">ประจำ</option>
-              <option value="parttime">Part-time</option>
-            </Select>
-          </Box>
-        </Flex>
-      </Box>
+                w="200px"
+                value={filterBranch}
+                onChange={(e) => setFilterBranch(e.target.value)}
+              >
+                <option value="">ทุกสาขา</option>
+                {branches.map((b) => (
+                  <option key={b._id} value={b._id}>
+                    {b.name}
+                  </option>
+                ))}
+              </Select>
+            </Box>
+            <Box>
+              <Text fontSize="xs" fontWeight="bold" color="gray.500" mb="1">
+                ประเภท
+              </Text>
+              <Select
+                bg="gray.50"
+                border="none"
+                size="sm"
+                borderRadius="lg"
+                w="160px"
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
+              >
+                <option value="">ทั้งหมด</option>
+                <option value="fulltime">ประจำ</option>
+                <option value="parttime">Part-time</option>
+              </Select>
+            </Box>
+          </Flex>
 
-      {/* Summary Cards */}
-      <SimpleGrid columns={{ base: 2, md: 4 }} spacing="4" mb="6">
-        <Box
-          p="4"
-          bg="white"
-          borderRadius="xl"
-          boxShadow="sm"
-          borderWidth="1px"
-          borderColor="gray.100"
-          textAlign="center"
-        >
-          <Text fontSize="2xl" fontWeight="bold" color="brand.600">
-            {employees.length}
-          </Text>
-          <Text fontSize="xs" color="gray.500">
-            พนักงานทั้งหมด
-          </Text>
-        </Box>
-        <Box
-          p="4"
-          bg="white"
-          borderRadius="xl"
-          boxShadow="sm"
-          borderWidth="1px"
-          borderColor="gray.100"
-          textAlign="center"
-        >
-          <Text fontSize="2xl" fontWeight="bold" color="blue.500">
-            {employees.filter((e) => e.employmentType === "fulltime").length}
-          </Text>
-          <Text fontSize="xs" color="gray.500">
-            ประจำ
-          </Text>
-        </Box>
-        <Box
-          p="4"
-          bg="white"
-          borderRadius="xl"
-          boxShadow="sm"
-          borderWidth="1px"
-          borderColor="gray.100"
-          textAlign="center"
-        >
-          <Text fontSize="2xl" fontWeight="bold" color="purple.500">
-            {employees.filter((e) => e.employmentType === "parttime").length}
-          </Text>
-          <Text fontSize="xs" color="gray.500">
-            Part-time
-          </Text>
-        </Box>
-        <Box
-          p="4"
-          bg="white"
-          borderRadius="xl"
-          boxShadow="sm"
-          borderWidth="1px"
-          borderColor="gray.100"
-          textAlign="center"
-        >
-          <Text fontSize="2xl" fontWeight="bold" color="green.500">
-            {employees.filter((e) => e.status === "active").length}
-          </Text>
-          <Text fontSize="xs" color="gray.500">
-            Active
-          </Text>
-        </Box>
-      </SimpleGrid>
+          {/* Summary Cards */}
+          <SimpleGrid columns={{ base: 2, md: 4 }} spacing="4" mb="6">
+            <Box
+              p="4"
+              bg="brand.50"
+              borderRadius="xl"
+              textAlign="center"
+              border="1px solid"
+              borderColor="brand.100"
+            >
+              <Text fontSize="2xl" fontWeight="bold" color="brand.600">
+                {companyFiltered.length}
+              </Text>
+              <Text fontSize="xs" color="gray.500">
+                พนักงานทั้งหมด
+              </Text>
+            </Box>
+            <Box
+              p="4"
+              bg="blue.50"
+              borderRadius="xl"
+              textAlign="center"
+              border="1px solid"
+              borderColor="blue.100"
+            >
+              <Text fontSize="2xl" fontWeight="bold" color="blue.500">
+                {
+                  companyFiltered.filter((e) => e.employmentType === "fulltime")
+                    .length
+                }
+              </Text>
+              <Text fontSize="xs" color="gray.500">
+                ประจำ
+              </Text>
+            </Box>
+            <Box
+              p="4"
+              bg="purple.50"
+              borderRadius="xl"
+              textAlign="center"
+              border="1px solid"
+              borderColor="purple.100"
+            >
+              <Text fontSize="2xl" fontWeight="bold" color="purple.500">
+                {
+                  companyFiltered.filter((e) => e.employmentType === "parttime")
+                    .length
+                }
+              </Text>
+              <Text fontSize="xs" color="gray.500">
+                Part-time
+              </Text>
+            </Box>
+            <Box
+              p="4"
+              bg="green.50"
+              borderRadius="xl"
+              textAlign="center"
+              border="1px solid"
+              borderColor="green.100"
+            >
+              <Text fontSize="2xl" fontWeight="bold" color="green.500">
+                {companyFiltered.filter((e) => e.status === "active").length}
+              </Text>
+              <Text fontSize="xs" color="gray.500">
+                Active
+              </Text>
+            </Box>
+          </SimpleGrid>
 
-      {/* Table */}
-      <Box
-        bg="white"
-        borderRadius="2xl"
-        boxShadow="sm"
-        borderWidth="1px"
-        borderColor="gray.100"
-        overflow="hidden"
-      >
-        {loading ? (
-          <Center py="20">
-            <Spinner size="xl" color="brand.500" />
-          </Center>
-        ) : (
-          <Box overflowX="auto">
-            <Table variant="simple" size="md">
-              <Thead bg="gray.50">
-                <Tr>
-                  <Th py="4" color="gray.500" fontSize="xs" fontWeight="bold">
-                    พนักงาน
-                  </Th>
-                  <Th py="4" color="gray.500" fontSize="xs" fontWeight="bold">
-                    แผนก / ตำแหน่ง
-                  </Th>
-                  <Th py="4" color="gray.500" fontSize="xs" fontWeight="bold">
-                    สาขา
-                  </Th>
-                  <Th py="4" color="gray.500" fontSize="xs" fontWeight="bold">
-                    ประเภท
-                  </Th>
-                  <Th
-                    py="4"
-                    color="gray.500"
-                    fontSize="xs"
-                    fontWeight="bold"
-                    isNumeric
-                  >
-                    เงินเดือน
-                  </Th>
-                  <Th
-                    py="4"
-                    color="gray.500"
-                    fontSize="xs"
-                    fontWeight="bold"
-                    textAlign="center"
-                  >
-                    สถานะ
-                  </Th>
-                  <Th py="4" w="100px"></Th>
-                </Tr>
-              </Thead>
-              <Tbody>
-                {filtered.map((emp) => (
-                  <Tr
-                    key={emp._id}
-                    _hover={{ bg: "blue.50", cursor: "pointer" }}
-                    transition="background 0.15s"
-                  >
-                    <Td py="4" onClick={() => handleView(emp)}>
-                      <Flex align="center">
-                        <Avatar
-                          size="sm"
-                          name={`${emp.firstNameTh} ${emp.lastNameTh}`}
-                          mr="3"
-                          bg="brand.100"
-                          color="brand.700"
-                        />
-                        <Box>
-                          <Text
-                            fontWeight="bold"
-                            color="gray.800"
-                            fontSize="sm"
-                          >
-                            {emp.firstNameTh} {emp.lastNameTh}
+          {/* Table */}
+          <Box
+            borderRadius="xl"
+            overflow="hidden"
+            borderWidth="1px"
+            borderColor="gray.100"
+          >
+            {loading ? (
+              <Center py="20">
+                <Spinner size="xl" color="brand.500" />
+              </Center>
+            ) : (
+              <Box overflowX="auto">
+                <Table variant="simple" size="md">
+                  <Thead bg="gray.50">
+                    <Tr>
+                      <Th color="gray.500" fontSize="xs" fontWeight="bold">
+                        พนักงาน
+                      </Th>
+                      <Th color="gray.500" fontSize="xs" fontWeight="bold">
+                        ตำแหน่ง
+                      </Th>
+                      <Th color="gray.500" fontSize="xs" fontWeight="bold">
+                        สาขา
+                      </Th>
+                      <Th color="gray.500" fontSize="xs" fontWeight="bold">
+                        ประเภท
+                      </Th>
+                      <Th
+                        color="gray.500"
+                        fontSize="xs"
+                        fontWeight="bold"
+                        isNumeric
+                        w="100px"
+                      >
+                        เงินเดือน
+                      </Th>
+                      <Th
+                        color="gray.500"
+                        fontSize="xs"
+                        fontWeight="bold"
+                        textAlign="center"
+                      >
+                        สถานะ
+                      </Th>
+                      <Th w="100px"></Th>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    {filtered.map((emp) => (
+                      <Tr
+                        key={emp._id}
+                        _hover={{ bg: "blue.50", cursor: "pointer" }}
+                        transition="background 0.15s"
+                      >
+                        <Td py="4" onClick={() => handleView(emp)}>
+                          <Flex align="center">
+                            <Avatar
+                              size="sm"
+                              name={`${emp.firstNameTh} ${emp.lastNameTh}`}
+                              mr="3"
+                              bg="#021841"
+                              color="white"
+                            />
+                            <Box>
+                              <Text
+                                fontWeight="bold"
+                                color="gray.800"
+                                fontSize="sm"
+                              >
+                                {emp.firstNameTh} {emp.lastNameTh}
+                              </Text>
+                              <Text fontSize="xs" color="gray.400">
+                                {emp.employeeId}
+                              </Text>
+                            </Box>
+                          </Flex>
+                        </Td>
+                        <Td py="4" onClick={() => handleView(emp)}>
+                          <Text fontSize="sm" color="gray.700">
+                            {emp.department}
                           </Text>
                           <Text fontSize="xs" color="gray.400">
-                            {emp.employeeId}
+                            {emp.position}
                           </Text>
-                        </Box>
-                      </Flex>
-                    </Td>
-                    <Td py="4" onClick={() => handleView(emp)}>
-                      <Text fontSize="sm" color="gray.700">
-                        {emp.department}
-                      </Text>
-                      <Text fontSize="xs" color="gray.400">
-                        {emp.position}
-                      </Text>
-                    </Td>
-                    <Td
-                      py="4"
-                      fontSize="sm"
-                      color="gray.600"
-                      onClick={() => handleView(emp)}
-                    >
-                      {Array.isArray(emp.branch)
-                        ? emp.branch
-                            .map((b) => b?.name)
-                            .filter(Boolean)
-                            .join(", ")
-                        : emp.branch?.name || "-"}
-                    </Td>
-                    <Td py="4" onClick={() => handleView(emp)}>
-                      <Badge
-                        colorScheme={
-                          emp.employmentType === "parttime" ? "purple" : "blue"
-                        }
-                        variant="subtle"
-                        borderRadius="full"
-                        px="2"
-                        fontSize="xs"
-                      >
-                        {emp.employmentType === "parttime"
-                          ? "Part-time"
-                          : "ประจำ"}
-                      </Badge>
-                    </Td>
-                    <Td
-                      py="4"
-                      isNumeric
-                      fontSize="sm"
-                      fontWeight="medium"
-                      color="gray.700"
-                      onClick={() => handleView(emp)}
-                    >
-                      {emp.baseSalary?.toLocaleString("th-TH")}
-                    </Td>
-                    <Td
-                      py="4"
-                      textAlign="center"
-                      onClick={() => handleView(emp)}
-                    >
-                      <Badge
-                        colorScheme={
-                          emp.status === "active"
-                            ? "green"
-                            : emp.status === "probation"
-                              ? "yellow"
-                              : "red"
-                        }
-                        variant="subtle"
-                        borderRadius="full"
-                        px="2"
-                        fontSize="xs"
-                      >
-                        {emp.status === "active"
-                          ? "Active"
-                          : emp.status === "probation"
-                            ? "ทดลองงาน"
-                            : "ลาออก"}
-                      </Badge>
-                    </Td>
-                    <Td py="4">
-                      <HStack spacing="1">
-                        <IconButton
-                          icon={<Eye size="14" />}
-                          size="xs"
-                          variant="ghost"
-                          color="gray.500"
+                        </Td>
+                        <Td
+                          py="4"
+                          fontSize="sm"
+                          color="gray.600"
                           onClick={() => handleView(emp)}
-                          aria-label="ดูรายละเอียด"
-                        />
-                        <IconButton
-                          icon={<Trash2 size="14" />}
-                          size="xs"
-                          variant="ghost"
-                          color="red.400"
-                          onClick={() => handleDeleteConfirm(emp)}
-                          aria-label="ลบ"
-                        />
-                      </HStack>
-                    </Td>
-                  </Tr>
-                ))}
-              </Tbody>
-            </Table>
-            {filtered.length === 0 && (
-              <Center py="10">
-                <Text color="gray.400">ไม่พบข้อมูลพนักงาน</Text>
-              </Center>
+                        >
+                          {Array.isArray(emp.branch)
+                            ? emp.branch
+                                .map((b) => b?.name)
+                                .filter(Boolean)
+                                .join(", ")
+                            : emp.branch?.name || "-"}
+                        </Td>
+                        <Td py="4" onClick={() => handleView(emp)}>
+                          <Badge
+                            colorScheme={
+                              emp.employmentType === "parttime"
+                                ? "#2f5855"
+                                : "#2f5855"
+                            }
+                            variant="subtle"
+                            borderRadius="full"
+                            px="2"
+                            fontSize="xs"
+                          >
+                            {emp.employmentType === "parttime"
+                              ? "Part-time"
+                              : "ประจำ"}
+                          </Badge>
+                        </Td>
+                        <Td
+                          py="4"
+                          isNumeric
+                          fontSize="sm"
+                          fontWeight="medium"
+                          color="gray.700"
+                          onClick={() => handleView(emp)}
+                        >
+                          {emp.baseSalary?.toLocaleString("th-TH")}
+                        </Td>
+                        <Td
+                          py="4"
+                          textAlign="center"
+                          onClick={() => handleView(emp)}
+                        >
+                          <Badge
+                            colorScheme={
+                              emp.status === "active"
+                                ? "#2f5855"
+                                : emp.status === "probation"
+                                  ? "yellow"
+                                  : "red"
+                            }
+                            variant="subtle"
+                            borderRadius="full"
+                            px="2"
+                            fontSize="xs"
+                          >
+                            {emp.status === "active"
+                              ? "Active"
+                              : emp.status === "probation"
+                                ? "ทดลองงาน"
+                                : "ลาออก"}
+                          </Badge>
+                        </Td>
+                        <Td py="4">
+                          <HStack spacing="1">
+                            <IconButton
+                              icon={<Eye size="14" />}
+                              size="xs"
+                              variant="ghost"
+                              color="#FFF"
+                              onClick={() => handleView(emp)}
+                              aria-label="ดูรายละเอียด"
+                              bg={"#021841"}
+                            />
+                            <IconButton
+                              icon={<Trash2 size="14" />}
+                              size="xs"
+                              variant="ghost"
+                              color="#FFF"
+                              onClick={() => handleDeleteConfirm(emp)}
+                              aria-label="ลบ"
+                              bg={"red"}
+                            />
+                          </HStack>
+                        </Td>
+                      </Tr>
+                    ))}
+                  </Tbody>
+                </Table>
+                {filtered.length === 0 && (
+                  <Center py="10">
+                    <Text color="gray.400">ไม่พบข้อมูลพนักงาน</Text>
+                  </Center>
+                )}
+              </Box>
             )}
           </Box>
-        )}
-      </Box>
+        </Box>
+      </Tabs>
 
       {/* Delete Confirmation Modal */}
       <Modal isOpen={isOpen} onClose={onClose} isCentered>

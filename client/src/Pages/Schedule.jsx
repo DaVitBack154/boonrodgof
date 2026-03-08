@@ -274,6 +274,11 @@ const Schedule = () => {
           payload.company = values.lessonCompany;
         }
 
+        // ถ้าเลือกลูกค้าหลายคน = สอนกลุ่ม → ข้ามการเช็คเวลาซ้ำ
+        if (courseIds.length > 1) {
+          payload.isGroupLesson = true;
+        }
+
         for (const cid of courseIds) {
           await addLesson(cid, payload);
         }
@@ -313,11 +318,15 @@ const Schedule = () => {
 
   const openEditModal = (lesson, sc) => {
     setEditingLesson({ lesson, sc });
+    loadEmployees();
     editForm.setFieldsValue({
       status: lesson.status,
       coachId: lesson.coach?._id,
       date: dayjs(lesson.lessonDate),
       time: dayjs(lesson.lessonDate).format("HH:00"),
+      branchId: lesson.branch?._id || lesson.branch,
+      commissionRate: lesson.commissionRate || sc.commissionRate || undefined,
+      company: lesson.company || sc.company || undefined,
     });
     setIsEditModalOpen(true);
   };
@@ -332,6 +341,10 @@ const Schedule = () => {
         coach: values.coachId,
         lessonDate: lessonDate,
       };
+
+      if (values.branchId) payload.branch = values.branchId;
+      if (values.commissionRate) payload.commissionRate = values.commissionRate;
+      if (values.company) payload.company = values.company;
 
       await updateLesson(
         editingLesson.sc._id,
@@ -531,45 +544,42 @@ const Schedule = () => {
             </Box>
             <Box ml={3}>
               <Heading size="md" color="#021841" fontWeight="bold">
-                ตารางสอน
+                ตารางการสอนของโค้ช
               </Heading>
-              <Text color="gray.500" fontSize="xs">
-                ตารางการสอนของโค้ช — ดูรายวัน / ดูทั้งเดือน
-              </Text>
+
+              {viewMode === "daily" && (
+                <HStack
+                  spacing="4"
+                  fontSize="xs"
+                  color="gray.500"
+                  display={{ base: "none", md: "flex" }}
+                >
+                  <Flex align="center" gap="1">
+                    <Box w="10px" h="10px" borderRadius="full" bg="#ED8936" />
+                    <Text>รอคอนเฟิร์ม</Text>
+                  </Flex>
+                  <Flex align="center" gap="1">
+                    <Box w="10px" h="10px" borderRadius="full" bg="#3182CE" />
+                    <Text>จองคลาส</Text>
+                  </Flex>
+                  <Flex align="center" gap="1">
+                    <CheckCircle size="14" color="#38A169" />
+                    <Text>มาเรียนแล้ว</Text>
+                  </Flex>
+                  <Flex align="center" gap="1">
+                    <XCircle size="14" color="#E53E3E" />
+                    <Text>ไม่มาเรียน (หักชั่วโมง)</Text>
+                  </Flex>
+                  <Flex align="center" gap="1">
+                    <AlertCircle size="14" color="#A0AEC0" />
+                    <Text>ยกเลิกคลาส</Text>
+                  </Flex>
+                </HStack>
+              )}
             </Box>
           </Flex>
 
           {/* Legend */}
-          {viewMode === "daily" && (
-            <HStack
-              spacing="4"
-              ml="4"
-              fontSize="xs"
-              color="gray.500"
-              display={{ base: "none", md: "flex" }}
-            >
-              <Flex align="center" gap="1">
-                <Box w="10px" h="10px" borderRadius="full" bg="#ED8936" />
-                <Text>รอคอนเฟิร์ม</Text>
-              </Flex>
-              <Flex align="center" gap="1">
-                <Box w="10px" h="10px" borderRadius="full" bg="#3182CE" />
-                <Text>จองคลาส</Text>
-              </Flex>
-              <Flex align="center" gap="1">
-                <CheckCircle size="14" color="#38A169" />
-                <Text>มาเรียนแล้ว</Text>
-              </Flex>
-              <Flex align="center" gap="1">
-                <XCircle size="14" color="#E53E3E" />
-                <Text>ไม่มาเรียน (หักชั่วโมง)</Text>
-              </Flex>
-              <Flex align="center" gap="1">
-                <AlertCircle size="14" color="#A0AEC0" />
-                <Text>ยกเลิกคลาส</Text>
-              </Flex>
-            </HStack>
-          )}
         </Flex>
 
         <Flex align="center" gap="3">
@@ -1098,9 +1108,21 @@ const Schedule = () => {
               borderWidth="1px"
               borderColor="gray.100"
             >
-              <Heading size="sm" mb="4" color="gray.800">
-                TOTAL LESSON
-              </Heading>
+              <Flex align="center" gap="2" mb="4">
+                <Heading size="sm" color="gray.800">
+                  TOTAL LESSON
+                </Heading>
+                <Badge
+                  bg={"#021841"}
+                  color="white"
+                  borderRadius="full"
+                  px="2"
+                  ml={2}
+                  fontSize="xs"
+                >
+                  {scheduleData?.lessons?.length || 0}
+                </Badge>
+              </Flex>
 
               {loading ? (
                 <Center py="10">
@@ -1119,15 +1141,15 @@ const Schedule = () => {
                       bg="gray.50"
                       borderRadius="lg"
                       borderLeft="3px solid"
-                      borderLeftColor={idx === 0 ? "#021841" : "gray.300"}
+                      borderLeftColor={idx === 0 ? "#021841" : "#021841"}
                     >
                       <Flex justify="space-between" align="center">
                         <Flex align="center" gap="2">
                           <Avatar
                             size="xs"
                             name={`${stat.coach.firstNameTh} ${stat.coach.lastNameTh}`}
-                            bg={idx === 0 ? "#021841" : "gray.200"}
-                            color={idx === 0 ? "white" : "gray.600"}
+                            bg={idx === 0 ? "#021841" : "#021841"}
+                            color={idx === 0 ? "white" : "white"}
                           />
                           <Box>
                             <Text
@@ -1190,7 +1212,7 @@ const Schedule = () => {
 
       {/* Add Lesson Modal */}
       <Modal
-        title="➕ เพิ่มนัดหมายเรียน"
+        title="เพิ่มนัดหมายเรียน"
         open={isAddModalOpen}
         onCancel={() => {
           setIsAddModalOpen(false);
@@ -1199,7 +1221,7 @@ const Schedule = () => {
         onOk={() => form.submit()}
         okText="บันทึก"
         cancelText="ยกเลิก"
-        width={900}
+        width={800}
         destroyOnClose
         footer={customerType ? undefined : null}
       >
@@ -1223,9 +1245,9 @@ const Schedule = () => {
               }}
               placeholder="-- เลือกประเภทลูกค้า --"
               options={[
-                { label: "⚡ ลูกค้าทดลองเรียน", value: "test" },
-                { label: "📋 ลูกค้าสมัครเรียนแล้ว", value: "existing" },
-                { label: "🆕 ลูกค้าใหม่", value: "new" },
+                { label: "ลูกค้าทดลองเรียน", value: "test" },
+                { label: "ลูกค้าสมัครเรียนแล้ว", value: "existing" },
+                // { label: "🆕 ลูกค้าใหม่", value: "new" },
               ]}
             />
           </Form.Item>
@@ -1353,8 +1375,8 @@ const Schedule = () => {
                     allowClear
                     placeholder="ใช้ค่าตั้งต้นจากคอร์ส"
                     options={[
-                      { label: "บริษัทพัฒนา", value: "บริษัทพัฒนา" },
-                      { label: "บริษัทTotal", value: "บริษัทTotal" },
+                      { label: "บุญรอดกอล์ฟพัฒนา", value: "บริษัทพัฒนา" },
+                      { label: "บุญรอดกอล์ฟโทเทิล", value: "บริษัทTotal" },
                     ]}
                   />
                 </Form.Item>
@@ -1417,36 +1439,56 @@ const Schedule = () => {
           {/* ===== Common fields (show only when type is selected) ===== */}
           {customerType && (
             <>
-              <Form.Item
-                name="branchId"
-                label="สาขา"
-                rules={[{ required: true, message: "กรุณาเลือกสาขา" }]}
-                initialValue={selectedBranch || undefined}
-              >
-                <AntSelect
-                  options={branches.map((b) => ({
-                    label: b.name,
-                    value: b._id,
-                  }))}
-                  placeholder="เลือกสาขา"
-                  onChange={(val) => {
-                    const selectedBr = branches.find((b) => b._id === val);
-                    const branchCode = selectedBr?.code || "";
-                    if (branchCode === "teeoff") {
-                      form.setFieldsValue({ company: "บริษัทพัฒนา" });
-                    } else if (
-                      branchCode === "srinakarin" ||
-                      branchCode === "suwannaphum"
-                    ) {
-                      form.setFieldsValue({ company: "บริษัทTotal" });
-                    } else if (branchCode === "ratchada") {
-                      form.setFieldsValue({ company: undefined });
-                    } else {
-                      form.setFieldsValue({ company: undefined });
-                    }
-                  }}
-                />
-              </Form.Item>
+              <Flex gap="4">
+                <Form.Item
+                  name="branchId"
+                  label="สาขา"
+                  rules={[{ required: true, message: "กรุณาเลือกสาขา" }]}
+                  initialValue={selectedBranch || undefined}
+                  style={{ flex: 1 }}
+                >
+                  <AntSelect
+                    options={branches.map((b) => ({
+                      label: b.name,
+                      value: b._id,
+                    }))}
+                    placeholder="เลือกสาขา"
+                    onChange={(val) => {
+                      const selectedBr = branches.find((b) => b._id === val);
+                      const branchCode = selectedBr?.code || "";
+                      if (branchCode === "teeoff") {
+                        form.setFieldsValue({ company: "บริษัทพัฒนา" });
+                      } else if (
+                        branchCode === "srinakarin" ||
+                        branchCode === "suwannaphum"
+                      ) {
+                        form.setFieldsValue({ company: "บริษัทTotal" });
+                      } else if (branchCode === "ratchada") {
+                        form.setFieldsValue({ company: undefined });
+                      } else {
+                        form.setFieldsValue({ company: undefined });
+                      }
+                    }}
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  name="coachId"
+                  label="โค้ชผู้สอน"
+                  rules={[{ required: true, message: "กรุณาเลือกโค้ช" }]}
+                  style={{ flex: 1 }}
+                >
+                  <AntSelect
+                    placeholder="เลือกโค้ช"
+                    options={allEmployees
+                      .filter((emp) => emp.position === "Coach")
+                      .map((c) => ({
+                        label: `${c.firstNameTh} (${c.nickname || ""})`,
+                        value: c._id,
+                      }))}
+                  />
+                </Form.Item>
+              </Flex>
 
               {customerType === "new" && (
                 <Form.Item
@@ -1499,20 +1541,6 @@ const Schedule = () => {
                   />
                 </Form.Item>
               )}
-
-              <Form.Item
-                name="coachId"
-                label="โค้ชผู้สอน"
-                rules={[{ required: true, message: "กรุณาเลือกโค้ช" }]}
-              >
-                <AntSelect
-                  placeholder="เลือกโค้ช"
-                  options={coaches.map((c) => ({
-                    label: `${c.firstNameTh} (${c.nickname || ""})`,
-                    value: c._id,
-                  }))}
-                />
-              </Form.Item>
 
               <Flex gap="4">
                 <Form.Item
@@ -1597,23 +1625,90 @@ const Schedule = () => {
             />
           </Form.Item>
 
-          <Form.Item
-            name="coachId"
-            label="เปลี่ยนโค้ชผู้สอน"
-            rules={[{ required: true, message: "กรุณาเลือกโค้ช" }]}
-          >
-            <AntSelect
-              placeholder="เลือกโค้ช"
-              disabled={
-                JSON.parse(localStorage.getItem("user") || "{}").role !==
-                "admin"
-              }
-              options={coaches.map((c) => ({
-                label: `${c.firstNameTh} (${c.nickname || ""})`,
-                value: c._id,
-              }))}
-            />
-          </Form.Item>
+          <Flex gap="4">
+            <Form.Item
+              name="coachId"
+              label="เปลี่ยนโค้ชผู้สอน"
+              rules={[{ required: true, message: "กรุณาเลือกโค้ช" }]}
+              style={{ flex: 1 }}
+            >
+              <AntSelect
+                placeholder="เลือกโค้ช"
+                disabled={
+                  JSON.parse(localStorage.getItem("user") || "{}").role !==
+                  "admin"
+                }
+                options={allEmployees
+                  .filter((emp) => emp.position === "Coach")
+                  .map((c) => ({
+                    label: `${c.firstNameTh} (${c.nickname || ""})`,
+                    value: c._id,
+                  }))}
+              />
+            </Form.Item>
+
+            <Form.Item
+              name="branchId"
+              label="สาขา"
+              rules={[{ required: true, message: "กรุณาเลือกสาขา" }]}
+              style={{ flex: 1 }}
+            >
+              <AntSelect
+                disabled={
+                  JSON.parse(localStorage.getItem("user") || "{}").role !==
+                  "admin"
+                }
+                options={branches.map((b) => ({
+                  label: b.name,
+                  value: b._id,
+                }))}
+                placeholder="เลือกสาขา"
+              />
+            </Form.Item>
+          </Flex>
+
+          <Flex gap="4">
+            <Form.Item
+              name="commissionRate"
+              label="Commission Rate (ครั้งนี้)"
+              style={{ flex: 1 }}
+            >
+              <AntSelect
+                allowClear
+                placeholder="-- เลือกเรท --"
+                disabled={
+                  JSON.parse(localStorage.getItem("user") || "{}").role !==
+                  "admin"
+                }
+                options={[
+                  { label: "40%", value: 40 },
+                  { label: "45%", value: 45 },
+                  { label: "50%", value: 50 },
+                  { label: "55%", value: 55 },
+                  { label: "60%", value: 60 },
+                  { label: "70%", value: 70 },
+                ]}
+              />
+            </Form.Item>
+            <Form.Item
+              name="company"
+              label="บริษัท (ครั้งนี้)"
+              style={{ flex: 1 }}
+            >
+              <AntSelect
+                allowClear
+                placeholder="-- เลือกบริษัท --"
+                disabled={
+                  JSON.parse(localStorage.getItem("user") || "{}").role !==
+                  "admin"
+                }
+                options={[
+                  { label: "บริษัทพัฒนา", value: "บริษัทพัฒนา" },
+                  { label: "บริษัทTotal", value: "บริษัทTotal" },
+                ]}
+              />
+            </Form.Item>
+          </Flex>
 
           <Flex gap="4">
             <Form.Item

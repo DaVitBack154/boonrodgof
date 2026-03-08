@@ -12,6 +12,20 @@ router.post('/test-lesson', async (req, res) => {
       return res.status(400).json({ error: 'กรุณากรอกข้อมูลให้ครบ (ชื่อลูกค้า, โค้ช, วันที่)' });
     }
 
+    // ตรวจสอบว่าโค้ชมีสอนเวลานี้หรือยัง (ห้ามจองทับ)
+    const existingLesson = await LessonRecord.findOne({
+      coach: coach,
+      lessonDate: new Date(lessonDate),
+      status: { $ne: 'cancelled' }
+    }).populate('coach', 'firstNameTh');
+
+    if (existingLesson) {
+      const coachName = existingLesson.coach ? existingLesson.coach.firstNameTh : 'โค้ช';
+      return res.status(400).json({ 
+        error: `ไม่สามารถจองได้ ${coachName} มีคลาสสอนในเวลานี้แล้ว` 
+      });
+    }
+
     const lesson = new LessonRecord({
       coach,
       lessonDate,
@@ -128,6 +142,26 @@ router.post('/:id/lessons', async (req, res) => {
     const course = await StudentCourse.findById(req.params.id);
     if (!course) return res.status(404).json({ error: 'ไม่พบข้อมูลคอร์ส' });
 
+    // ตรวจสอบว่าโค้ชมีสอนเวลานี้หรือยัง (ข้ามการเช็คสำหรับสอนกลุ่ม)
+    const reqLessonDate = new Date(req.body.lessonDate);
+    const reqCoach = req.body.coach;
+    const isGroupLesson = req.body.isGroupLesson === true;
+    
+    if (reqCoach && reqLessonDate && !isGroupLesson) {
+      const existingLesson = await LessonRecord.findOne({
+        coach: reqCoach,
+        lessonDate: reqLessonDate,
+        status: { $ne: 'cancelled' }
+      }).populate('coach', 'firstNameTh');
+
+      if (existingLesson) {
+        const coachName = existingLesson.coach ? existingLesson.coach.firstNameTh : 'โค้ช';
+        return res.status(400).json({ 
+          error: `ไม่สามารถจองได้ ${coachName} มีคลาสสอนในเวลานี้แล้ว` 
+        });
+      }
+    }
+
     // หาครั้งล่าสุดที่เรียนไปแล้วเพื่อบวกเข้าไป
     const latestLesson = await LessonRecord.findOne({ studentCourse: course._id }).sort('-lessonNumber');
     const nextLessonNumber = latestLesson ? latestLesson.lessonNumber + 1 : 1;
@@ -186,6 +220,38 @@ router.post('/:id/lessons', async (req, res) => {
 // PUT /api/student-courses/:courseId/lessons/:lessonId - แก้ไขบันทึกการเรียน
 router.put('/:courseId/lessons/:lessonId', async (req, res) => {
   try {
+    // ดึงข้อมูล lesson เดิมมาเทียบก่อน
+    const originalLesson = await LessonRecord.findById(req.params.lessonId);
+    if (!originalLesson) return res.status(404).json({ error: 'ไม่พบข้อมูลบันทึกการเรียน' });
+
+    const reqLessonDate = req.body.lessonDate ? new Date(req.body.lessonDate) : null;
+    const reqCoach = req.body.coach;
+    const newStatus = req.body.status;
+
+    // เช็คว่าโค้ชหรือเวลาถูกเปลี่ยนจริงๆ หรือไม่
+    const coachChanged = reqCoach && reqCoach !== originalLesson.coach?.toString();
+    const timeChanged = reqLessonDate && reqLessonDate.getTime() !== new Date(originalLesson.lessonDate).getTime();
+
+    // ตรวจสอบซ้ำเฉพาะเมื่อมีการเปลี่ยนโค้ชหรือเวลา
+    if ((coachChanged || timeChanged) && newStatus !== 'cancelled') {
+      const checkCoach = reqCoach || originalLesson.coach;
+      const checkDate = reqLessonDate || originalLesson.lessonDate;
+
+      const existingLesson = await LessonRecord.findOne({
+        _id: { $ne: req.params.lessonId },
+        coach: checkCoach,
+        lessonDate: checkDate,
+        status: { $ne: 'cancelled' }
+      }).populate('coach', 'firstNameTh');
+
+      if (existingLesson) {
+        const coachName = existingLesson.coach ? existingLesson.coach.firstNameTh : 'โค้ช';
+        return res.status(400).json({ 
+          error: `ไม่สามารถเปลี่ยนเวลา/โค้ชได้ ${coachName} มีคลาสสอนในเวลานี้แล้ว` 
+        });
+      }
+    }
+
     const lesson = await LessonRecord.findByIdAndUpdate(
       req.params.lessonId,
       req.body,

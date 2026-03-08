@@ -114,6 +114,7 @@ const CommissionDetailModal = ({
   coachId,
   coachName,
   period,
+  company,
 }) => {
   const [details, setDetails] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -132,11 +133,19 @@ const CommissionDetailModal = ({
     }
   }, [isOpen, coachId, period]);
 
-  const totalCom = details.reduce((sum, item) => {
+  const filteredDetails = useMemo(() => {
+    if (!company) return details;
+    return details.filter((item) => item.studentCourse?.company === company);
+  }, [details, company]);
+
+  const totalCom = filteredDetails.reduce((sum, item) => {
     if (!item.studentCourse) return sum;
-    const lessonRate = item.commissionRate != null ? item.commissionRate : (item.studentCourse?.commissionRate || 0);
+    const lessonRate =
+      item.commissionRate != null
+        ? item.commissionRate
+        : item.studentCourse?.commissionRate || 0;
     const perLessonRate = item.studentCourse?.perLessonRate || 0;
-    return sum + Math.round((perLessonRate * lessonRate / 100) * 100) / 100;
+    return sum + Math.round(((perLessonRate * lessonRate) / 100) * 100) / 100;
   }, 0);
 
   return (
@@ -162,7 +171,7 @@ const CommissionDetailModal = ({
             <Center py="10">
               <Spinner color="brand.500" />
             </Center>
-          ) : details.length === 0 ? (
+          ) : filteredDetails.length === 0 ? (
             <Center py="10">
               <Text color="gray.500">ไม่มีข้อมูลการสอนในงวดนี้</Text>
             </Center>
@@ -181,27 +190,29 @@ const CommissionDetailModal = ({
                   </Tr>
                 </Thead>
                 <Tbody>
-                  {details.map((item) => {
-                    const lessonRate = item.commissionRate != null ? item.commissionRate : (item.studentCourse?.commissionRate || 0);
-                    const perLessonRate = item.studentCourse?.perLessonRate || 0;
-                    const comPerLesson = Math.round((perLessonRate * lessonRate / 100) * 100) / 100;
+                  {filteredDetails.map((item) => {
+                    const lessonRate =
+                      item.commissionRate != null
+                        ? item.commissionRate
+                        : item.studentCourse?.commissionRate || 0;
+                    const perLessonRate =
+                      item.studentCourse?.perLessonRate || 0;
+                    const comPerLesson =
+                      Math.round(((perLessonRate * lessonRate) / 100) * 100) /
+                      100;
                     return (
                       <Tr key={item._id} _hover={{ bg: "gray.50" }}>
-                        <Td>{dayjs(item.lessonDate).format("DD MMM YYYY HH:mm")}</Td>
+                        <Td>
+                          {dayjs(item.lessonDate).format("DD MMM YYYY HH:mm")}
+                        </Td>
                         <Td>{item.studentCourse?.studentName || "-"}</Td>
-                        <Td>{item.lessonNumber}/{item.studentCourse?.totalLessons}</Td>
+                        <Td>
+                          {item.lessonNumber}/{item.studentCourse?.totalLessons}
+                        </Td>
                         <Td isNumeric>{lessonRate}%</Td>
                         <Td fontSize="xs">{item.branch?.name || "-"}</Td>
-                        <Td>
-                          <Badge
-                            colorScheme={item.studentCourse?.company === 'บริษัทTotal' ? 'purple' : 'teal'}
-                            variant="subtle"
-                            borderRadius="full"
-                            px="2"
-                            fontSize="xx-small"
-                          >
-                            {item.studentCourse?.company || "-"}
-                          </Badge>
+                        <Td fontSize="xs">
+                          {item.studentCourse?.company || "-"}
                         </Td>
                         <Td isNumeric fontWeight="bold" color="green.600">
                           {fmt(comPerLesson)}
@@ -466,9 +477,10 @@ const Payroll = () => {
   } = useDisclosure();
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [selectedCoachForCom, setSelectedCoachForCom] = useState(null);
+  const [selectedCompanyForCom, setSelectedCompanyForCom] = useState("");
   const [records, setRecords] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [companyFilter, setCompanyFilter] = useState("");
+  const [companyFilter, setCompanyFilter] = useState("บริษัทพัฒนา");
   const [loading, setLoading] = useState(false);
   const [calculating, setCalculating] = useState(false);
   const [period, setPeriod] = useState(() => {
@@ -476,6 +488,7 @@ const Payroll = () => {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   });
   const [editingDeductions, setEditingDeductions] = useState({});
+  const [editingSales, setEditingSales] = useState({});
   const toast = useToast();
 
   const fetchPayroll = async () => {
@@ -524,6 +537,7 @@ const Payroll = () => {
   const handleViewCommission = (record) => {
     if (record.commissionAmount > 0) {
       setSelectedCoachForCom(record.employee);
+      setSelectedCompanyForCom(record.company);
       onComOpen();
     }
   };
@@ -544,6 +558,30 @@ const Payroll = () => {
       });
       toast({
         title: "บันทึกหักอื่นๆ เรียบร้อย",
+        status: "success",
+        duration: 2000,
+      });
+    } catch (err) {
+      toast({ title: "บันทึกไม่สำเร็จ", status: "error", duration: 2000 });
+    }
+  };
+
+  const handleSalesChange = (recordId, value) => {
+    setEditingSales((prev) => ({ ...prev, [recordId]: value }));
+  };
+
+  const handleSaveSales = async (recordId) => {
+    const value = parseFloat(editingSales[recordId]) || 0;
+    try {
+      const updated = await updateSalesBonus(recordId, value);
+      setRecords((prev) => prev.map((r) => (r._id === recordId ? updated : r)));
+      setEditingSales((prev) => {
+        const copy = { ...prev };
+        delete copy[recordId];
+        return copy;
+      });
+      toast({
+        title: "บันทึก SALE เรียบร้อย",
         status: "success",
         duration: 2000,
       });
@@ -588,36 +626,55 @@ const Payroll = () => {
     const prevMonth = parseInt(m) - 1 === 0 ? 12 : parseInt(m) - 1;
     const prevYear = parseInt(m) - 1 === 0 ? parseInt(y) - 1 : parseInt(y);
     const THAI_MONTHS = [
-      "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน",
-      "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม",
-      "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
+      "มกราคม",
+      "กุมภาพันธ์",
+      "มีนาคม",
+      "เมษายน",
+      "พฤษภาคม",
+      "มิถุนายน",
+      "กรกฎาคม",
+      "สิงหาคม",
+      "กันยายน",
+      "ตุลาคม",
+      "พฤศจิกายน",
+      "ธันวาคม",
     ];
-    return `26 ${THAI_MONTHS[prevMonth - 1].slice(0, 3)} ${prevYear} - 25 ${THAI_MONTHS[parseInt(m) - 1].slice(0, 3)} ${y}`;
+    return `26 ${THAI_MONTHS[prevMonth - 1]} ${prevYear} - 25 ${THAI_MONTHS[parseInt(m) - 1]} ${y}`;
   }, [period]);
 
   // Export CSV
   const exportToCSV = () => {
     if (!filteredRecords || filteredRecords.length === 0) {
-      toast({ title: "ไม่มีข้อมูลสำหรับ Export", status: "warning", duration: 2000 });
+      toast({
+        title: "ไม่มีข้อมูลสำหรับ Export",
+        status: "warning",
+        duration: 2000,
+      });
       return;
     }
 
     // CSV Header
     let csvContent = "\uFEFF"; // BOM for UTF-8
-    csvContent += "พนักงาน,ประเภท,บริษัท,เงินเดือน,ค่าคอม,SALE,รวมรายได้,ภงด.1,สปส.,หักอื่นๆ,รวมหัก,ยอดสุทธิ\n";
+    csvContent +=
+      "พนักงาน,ประเภท,บริษัท,เงินเดือน,ค่าคอม,SALE,รวมรายได้,ภงด.1,สปส.,หักอื่นๆ,รวมหัก,ยอดสุทธิ\n";
 
     // Rows
     filteredRecords.forEach((r) => {
-      const empName = r.employee ? `${r.employee.firstNameTh} ${r.employee.lastNameTh} ${r.employee.nickname ? `(${r.employee.nickname})` : ""}` : "ไม่ทราบชื่อ";
+      const empName = r.employee
+        ? `${r.employee.firstNameTh} ${r.employee.lastNameTh} ${r.employee.nickname ? `(${r.employee.nickname})` : ""}`
+        : "ไม่ทราบชื่อ";
       const empType = r.employmentType === "fulltime" ? "ประจำ" : "Part-time";
       const company = r.company || "-";
       const baseSalary = r.baseSalary || 0;
       const commission = r.commissionAmount || 0;
       const salesBonus = r.salesBonus || 0;
       const totalIncome = r.totalIncome || 0;
-      
-      const tax = r.employmentType === "fulltime" ? (r.withholdingTax || 0) : (r.parttimeWithholding || 0);
-      const sso = r.employmentType === "fulltime" ? (r.socialSecurity || 0) : 0;
+
+      const tax =
+        r.employmentType === "fulltime"
+          ? r.withholdingTax || 0
+          : r.parttimeWithholding || 0;
+      const sso = r.employmentType === "fulltime" ? r.socialSecurity || 0 : 0;
       const otherDeduct = r.otherDeductions || 0;
       const totalDeduct = r.totalDeductions || 0;
       const netPay = r.netPay || 0;
@@ -634,22 +691,32 @@ const Payroll = () => {
         sso,
         otherDeduct,
         totalDeduct,
-        netPay
+        netPay,
       ];
       csvContent += row.join(",") + "\n";
     });
 
     // Totals Row
-    let totalBase = 0, totalCom = 0, totalSale = 0, sumIncome = 0;
-    let totalTax = 0, totalSso = 0, totalOtherDeduct = 0, sumDeduct = 0, sumNet = 0;
+    let totalBase = 0,
+      totalCom = 0,
+      totalSale = 0,
+      sumIncome = 0;
+    let totalTax = 0,
+      totalSso = 0,
+      totalOtherDeduct = 0,
+      sumDeduct = 0,
+      sumNet = 0;
 
-    filteredRecords.forEach(r => {
+    filteredRecords.forEach((r) => {
       totalBase += r.baseSalary || 0;
       totalCom += r.commissionAmount || 0;
       totalSale += r.salesBonus || 0;
       sumIncome += r.totalIncome || 0;
-      totalTax += r.employmentType === "fulltime" ? (r.withholdingTax || 0) : (r.parttimeWithholding || 0);
-      totalSso += r.employmentType === "fulltime" ? (r.socialSecurity || 0) : 0;
+      totalTax +=
+        r.employmentType === "fulltime"
+          ? r.withholdingTax || 0
+          : r.parttimeWithholding || 0;
+      totalSso += r.employmentType === "fulltime" ? r.socialSecurity || 0 : 0;
       totalOtherDeduct += r.otherDeductions || 0;
       sumDeduct += r.totalDeductions || 0;
       sumNet += r.netPay || 0;
@@ -667,12 +734,12 @@ const Payroll = () => {
       totalSso,
       totalOtherDeduct,
       sumDeduct,
-      sumNet
+      sumNet,
     ];
     csvContent += totalRow.join(",") + "\n";
 
     // Create Blob and trigger download
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -727,10 +794,10 @@ const Payroll = () => {
         </Box>
         <HStack spacing="3" flexWrap="wrap">
           <Button
-            bg="brand.600"
+            bg={"#021841"}
             color="white"
             leftIcon={<Calculator size="16" />}
-            _hover={{ bg: "brand.700" }}
+            _hover={{ bg: "#021841" }}
             borderRadius="lg"
             size="sm"
             px="5"
@@ -742,10 +809,15 @@ const Payroll = () => {
           </Button>
         </HStack>
       </Flex>
-
       {/* Company Tabs and Enclosed Content */}
       <Tabs
-        index={companyFilter === "บริษัทพัฒนา" ? 0 : companyFilter === "บริษัทTotal" ? 1 : 2}
+        index={
+          companyFilter === "บริษัทพัฒนา"
+            ? 0
+            : companyFilter === "บริษัทTotal"
+              ? 1
+              : 2
+        }
         onChange={(index) => {
           const companies = ["บริษัทพัฒนา", "บริษัทTotal", ""];
           setCompanyFilter(companies[index]);
@@ -757,30 +829,51 @@ const Payroll = () => {
           <Tab
             bg="gray.50"
             color="gray.500"
-            _selected={{ color: "brand.700", bg: "white", borderTop: "3px solid", borderTopColor: "brand.600", borderBottomColor: "white", fontWeight: "bold" }}
+            _selected={{
+              color: "brand.700",
+              bg: "white",
+              borderTop: "3px solid",
+              borderTopColor: "brand.600",
+              borderBottomColor: "white",
+              fontWeight: "bold",
+            }}
             fontWeight="semibold"
             px="8"
             py="3"
             borderTopRadius="xl"
           >
-            บริษัทพัฒนา
+            บุญรอดกอล์ฟพัฒนา
           </Tab>
           <Tab
             bg="gray.50"
             color="gray.500"
-            _selected={{ color: "brand.700", bg: "white", borderTop: "3px solid", borderTopColor: "brand.600", borderBottomColor: "white", fontWeight: "bold" }}
+            _selected={{
+              color: "brand.700",
+              bg: "white",
+              borderTop: "3px solid",
+              borderTopColor: "brand.600",
+              borderBottomColor: "white",
+              fontWeight: "bold",
+            }}
             fontWeight="semibold"
             px="8"
             py="3"
             borderTopRadius="xl"
             ml="1"
           >
-            บริษัทTotal
+            บุญรอดกอล์ฟโทเทิล
           </Tab>
           <Tab
             bg="gray.50"
             color="gray.500"
-            _selected={{ color: "brand.700", bg: "white", borderTop: "3px solid", borderTopColor: "brand.600", borderBottomColor: "white", fontWeight: "bold" }}
+            _selected={{
+              color: "brand.700",
+              bg: "white",
+              borderTop: "3px solid",
+              borderTopColor: "brand.600",
+              borderBottomColor: "white",
+              fontWeight: "bold",
+            }}
             fontWeight="semibold"
             px="8"
             py="3"
@@ -790,7 +883,6 @@ const Payroll = () => {
             ยอดรวมทั้งหมด
           </Tab>
         </TabList>
-
         <Box
           bg="white"
           borderWidth="1px"
@@ -802,576 +894,663 @@ const Payroll = () => {
         >
           {/* Filters Inside Tabs */}
           <Box mb="8">
-        <Flex
-          gap="4"
-          flexWrap="wrap"
-          alignItems="flex-end"
-          justify="space-between"
-        >
-          <Flex gap="4" flexWrap="wrap" alignItems="flex-end">
-            <Box>
-              <Text
-                fontSize="xs"
-                fontWeight="bold"
-                color="gray.500"
-                textTransform="uppercase"
-                letterSpacing="wide"
-                mb="2"
-              >
-                งวดเงินเดือน
-              </Text>
-              <Select
-                bg="gray.50"
-                border="none"
-                borderRadius="lg"
-                w="220px"
-                size="sm"
-                value={period}
-                onChange={(e) => setPeriod(e.target.value)}
-              >
-                {monthOptions.map((m) => (
-                  <option key={m.value} value={m.value}>
-                    {m.label}
-                  </option>
-                ))}
-              </Select>
-            </Box>
-            <Box>
-              <Text fontSize="xs" color="gray.400">
-                {records.length > 0
-                  ? `แสดง ${filteredRecords.length} รายการ | ประจำ ${filteredRecords.filter((r) => r.employmentType === "fulltime").length} | Part-time ${filteredRecords.filter((r) => r.employmentType === "parttime").length}`
-                  : "ยังไม่มีข้อมูลงวดนี้"}
-              </Text>
-              <Text fontSize="xs" color="blue.500" fontWeight="semibold">
-                รอบบิล: {periodLabel}
-              </Text>
-            </Box>
-          </Flex>
-            <Flex gap="3" w={{ base: "100%", md: "auto" }}>
-              <InputGroup size="sm" w={{ base: "100%", md: "250px" }}>
-                <InputLeftAddon bg="gray.50" border="none">
-                  <Search size="14" />
-                </InputLeftAddon>
-                <Input
-                  placeholder="ค้นหาชื่อ, นามสกุล, ชื่อเล่น..."
-                  bg="gray.50"
-                  border="none"
-                  borderRadius="lg"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  _focus={{
-                    bg: "white",
-                    borderWidth: "1px",
-                    borderColor: "brand.300",
-                  }}
-                />
-              </InputGroup>
-              <Button
-                size="sm"
-                leftIcon={<Download size={16} />}
-                colorScheme="green"
-                variant="outline"
-                onClick={exportToCSV}
-                isDisabled={filteredRecords.length === 0}
-              >
-                Export CSV
-              </Button>
-            </Flex>
-        </Flex>
-      </Box>
-
-      {/* Summary Cards */}
-      <SimpleGrid columns={{ base: 1, md: 3 }} spacing="6" mb="8">
-            <Box
-          p="6"
-          bg="white"
-          borderRadius="2xl"
-          boxShadow="sm"
-          borderWidth="1px"
-          borderColor="gray.100"
-          borderLeft="4px solid"
-          borderLeftColor="green.400"
-        >
-          <Stat>
-            <StatLabel fontSize="xs" color="gray.500" fontWeight="semibold">
-              รวมรายได้ทั้งหมด
-            </StatLabel>
-            <StatNumber fontSize="2xl" color="gray.800" fontWeight="bold">
-              ฿{fmt(totals.totalIncome)}
-            </StatNumber>
-          </Stat>
-        </Box>
-        <Box
-          p="6"
-          bg="white"
-          borderRadius="2xl"
-          boxShadow="sm"
-          borderWidth="1px"
-          borderColor="gray.100"
-          borderLeft="4px solid"
-          borderLeftColor="red.400"
-        >
-          <Stat>
-            <StatLabel fontSize="xs" color="gray.500" fontWeight="semibold">
-              รวมรายการหัก
-            </StatLabel>
-            <StatNumber fontSize="2xl" color="red.500" fontWeight="bold">
-              - ฿{fmt(totals.totalDeductions)}
-            </StatNumber>
-          </Stat>
-        </Box>
-        <Box
-          p="6"
-          bg="white"
-          borderRadius="2xl"
-          boxShadow="sm"
-          borderWidth="1px"
-          borderColor="gray.100"
-          borderLeft="4px solid"
-          borderLeftColor="brand.500"
-        >
-          <Stat>
-            <StatLabel fontSize="xs" color="gray.500" fontWeight="semibold">
-              รวมยอดสุทธิจ่าย
-            </StatLabel>
-            <StatNumber fontSize="2xl" color="brand.700" fontWeight="bold">
-              ฿{fmt(totals.netPay)}
-            </StatNumber>
-          </Stat>
-        </Box>
-      </SimpleGrid>
-
-      {/* Payroll Table */}
-      <Box
-        bg="white"
-        borderRadius="2xl"
-        boxShadow="sm"
-        borderWidth="1px"
-        borderColor="gray.100"
-        overflow="hidden"
-      >
-        {loading ? (
-          <Center py="20">
-            <Spinner size="xl" color="brand.500" />
-          </Center>
-        ) : records.length === 0 ? (
-          <Center py="20" flexDirection="column">
-            <Text color="gray.400" mb="4">
-              ยังไม่มีข้อมูลเงินเดือนงวดนี้
-            </Text>
-            <Button
-              bg="brand.600"
-              color="white"
-              leftIcon={<Calculator size="16" />}
-              _hover={{ bg: "brand.700" }}
-              borderRadius="lg"
-              size="sm"
-              onClick={handleCalculate}
-              isLoading={calculating}
+            <Flex
+              gap="4"
+              flexWrap="wrap"
+              alignItems="flex-end"
+              justify="space-between"
             >
-              ประมวลผลเงินเดือน
-            </Button>
-          </Center>
-        ) : (
-          <Box overflowX="auto">
-            <Table variant="simple" size="md">
-              <Thead bg="gray.50">
-                <Tr>
-                  <Th py="4" color="gray.500" fontSize="xs" fontWeight="bold">
-                    พนักงาน
-                  </Th>
-                  <Th py="4" color="gray.500" fontSize="xs" fontWeight="bold">
-                    ประเภท
-                  </Th>
-                  <Th py="4" color="gray.500" fontSize="xs" fontWeight="bold">
-                    บริษัท
-                  </Th>
-                  <Th
-                    py="4"
+              <Flex gap="4" flexWrap="wrap" alignItems="flex-end">
+                <Box>
+                  <Text
+                    fontSize="xs"
+                    fontWeight="bold"
                     color="gray.500"
-                    fontSize="xs"
-                    fontWeight="bold"
-                    isNumeric
+                    textTransform="uppercase"
+                    letterSpacing="wide"
+                    mb="2"
                   >
-                    เงินเดือน
-                  </Th>
-                  <Th
-                    py="4"
-                    fontSize="xs"
-                    fontWeight="bold"
-                    isNumeric
-                    color="green.600"
+                    งวดเงินเดือน
+                  </Text>
+                  <Select
+                    bg="gray.50"
+                    border="none"
+                    borderRadius="lg"
+                    w="220px"
+                    size="sm"
+                    value={period}
+                    onChange={(e) => setPeriod(e.target.value)}
                   >
-                    ค่าคอม
-                  </Th>
-                  <Th
-                    py="4"
-                    fontSize="xs"
-                    fontWeight="bold"
-                    isNumeric
-                    color="teal.600"
-                  >
-                    Sale
-                  </Th>
-                  <Th
-                    py="4"
-                    color="gray.500"
-                    fontSize="xs"
-                    fontWeight="bold"
-                    isNumeric
-                  >
-                    รวมรายได้
-                  </Th>
-                  <Th
-                    py="4"
-                    fontSize="xs"
-                    fontWeight="bold"
-                    isNumeric
-                    color="orange.600"
-                  >
-                    ภวด.1
-                  </Th>
-                  <Th
-                    py="4"
-                    fontSize="xs"
-                    fontWeight="bold"
-                    isNumeric
-                    color="blue.600"
-                  >
-                    สปส.
-                  </Th>
-                  <Th
-                    py="4"
-                    fontSize="xs"
-                    fontWeight="bold"
-                    isNumeric
-                    color="red.600"
-                  >
-                    <Tooltip label="HR กรอกเอง (เฉพาะประจำ)">หักอื่นๆ</Tooltip>
-                  </Th>
-                  <Th
-                    py="4"
-                    fontSize="xs"
-                    fontWeight="bold"
-                    isNumeric
-                    color="red.600"
-                  >
-                    รวมหัก
-                  </Th>
-                  <Th
-                    py="4"
-                    fontSize="xs"
-                    fontWeight="bold"
-                    isNumeric
-                    color="brand.700"
-                  >
-                    ยอดสุทธิ
-                  </Th>
-                  <Th py="4" w="50px"></Th>
-                </Tr>
-              </Thead>
-              <Tbody>
-                {filteredRecords.map((record) => {
-                  const emp = record.employee;
-                  if (!emp) return null;
-                  const isParttime = record.employmentType === "parttime";
-                  const isEditingThis =
-                    editingDeductions[record._id] !== undefined;
+                    {monthOptions.map((m) => (
+                      <option key={m.value} value={m.value}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </Select>
+                </Box>
+                <Box>
+                  <Text fontSize="xs" color="gray.400">
+                    {records.length > 0
+                      ? `แสดง ${filteredRecords.length} รายการ | ประจำ ${filteredRecords.filter((r) => r.employmentType === "fulltime").length} | Part-time ${filteredRecords.filter((r) => r.employmentType === "parttime").length}`
+                      : "ยังไม่มีข้อมูลงวดนี้"}
+                  </Text>
+                  <Text fontSize="xs" color="blue.500" fontWeight="semibold">
+                    รอบบิล: {periodLabel}
+                  </Text>
+                </Box>
+              </Flex>
+              <Flex gap="3" w={{ base: "100%", md: "auto" }}>
+                <InputGroup size="sm" w={{ base: "100%", md: "250px" }}>
+                  <InputLeftAddon bg="gray.50" border="none">
+                    <Search size="14" />
+                  </InputLeftAddon>
+                  <Input
+                    placeholder="ค้นหาชื่อ, นามสกุล, ชื่อเล่น..."
+                    bg="gray.50"
+                    border="none"
+                    borderRadius="lg"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    _focus={{
+                      bg: "white",
+                      borderWidth: "1px",
+                      borderColor: "brand.300",
+                    }}
+                  />
+                </InputGroup>
+                <Button
+                  size="sm"
+                  leftIcon={<Download size={16} />}
+                  colorScheme="green"
+                  variant="outline"
+                  onClick={exportToCSV}
+                  isDisabled={filteredRecords.length === 0}
+                >
+                  Export CSV
+                </Button>
+              </Flex>
+            </Flex>
+          </Box>
 
-                  return (
-                    <Tr
-                      key={record._id}
-                      _hover={{ bg: "blue.50" }}
-                      transition="background 0.15s"
-                      bg={isParttime ? "purple.50" : undefined}
-                    >
-                      <Td
-                        py="4"
-                        cursor="pointer"
-                        onClick={() => handleViewDetail(record)}
-                      >
-                        <Flex align="center">
-                          <Avatar
-                            size="sm"
-                            name={`${emp.firstNameTh} ${emp.lastNameTh}`}
-                            mr="3"
-                            bg="brand.100"
-                            color="brand.700"
-                          />
-                          <Box>
-                            <Text
-                              fontWeight="bold"
-                              color="gray.800"
-                              fontSize="sm"
-                            >
-                              {emp.firstNameTh} {emp.lastNameTh}
-                            </Text>
-                            <Text fontSize="xs" color="gray.400">
-                              {emp.nickname
-                                ? `(${emp.nickname})`
-                                : emp.employeeId}{" "}
-                              · {emp.department}
-                            </Text>
-                          </Box>
-                        </Flex>
-                      </Td>
-                      <Td py="4">
-                        <Badge
-                          colorScheme={isParttime ? "purple" : "blue"}
-                          variant="subtle"
-                          borderRadius="full"
-                          px="2"
-                          fontSize="xs"
-                        >
-                          {isParttime ? "Part-time" : "ประจำ"}
-                        </Badge>
-                      </Td>
-                      <Td py="4">
-                        <Badge
-                          colorScheme={record.company === 'บริษัทTotal' ? 'purple' : 'teal'}
-                          variant="subtle"
-                          borderRadius="full"
-                          px="2"
-                          fontSize="xx-small"
-                        >
-                          {record.company || "-"}
-                        </Badge>
-                      </Td>
-                      <Td
-                        py="4"
-                        isNumeric
-                        fontSize="sm"
-                        color="gray.700"
-                        fontWeight="medium"
-                      >
-                        {fmt(record.baseSalary)}
-                      </Td>
-                      <Td
-                        py="4"
-                        isNumeric
-                        fontSize="sm"
-                        color={
-                          record.commissionAmount > 0 ? "green.600" : "gray.300"
-                        }
-                        fontWeight={
-                          record.commissionAmount > 0 ? "bold" : "normal"
-                        }
-                        cursor={
-                          record.commissionAmount > 0 ? "pointer" : "default"
-                        }
-                        onClick={() => handleViewCommission(record)}
-                        _hover={
-                          record.commissionAmount > 0
-                            ? {
-                                textDecoration: "underline",
-                                color: "green.700",
-                              }
-                            : {}
-                        }
-                      >
-                        {record.commissionAmount > 0
-                          ? fmt(record.commissionAmount)
-                          : "-"}
-                      </Td>
-                      <Td
-                        py="4"
-                        isNumeric
-                        fontSize="sm"
-                        color={record.salesBonus > 0 ? "teal.600" : "gray.300"}
-                        fontWeight={record.salesBonus > 0 ? "bold" : "normal"}
-                      >
-                        {record.salesBonus > 0 ? fmt(record.salesBonus) : "-"}
-                      </Td>
-                      <Td
-                        py="4"
-                        isNumeric
+          {/* Summary Cards */}
+          <SimpleGrid columns={{ base: 1, md: 3 }} spacing="6" mb="8">
+            <Box
+              p="6"
+              bg="white"
+              borderRadius="2xl"
+              boxShadow="sm"
+              borderWidth="1px"
+              borderColor="gray.100"
+              borderLeft="4px solid"
+              borderLeftColor="green.400"
+            >
+              <Stat>
+                <StatLabel fontSize="xs" color="gray.500" fontWeight="semibold">
+                  รวมรายได้ทั้งหมด
+                </StatLabel>
+                <StatNumber fontSize="2xl" color="gray.800" fontWeight="bold">
+                  ฿{fmt(totals.totalIncome)}
+                </StatNumber>
+              </Stat>
+            </Box>
+            <Box
+              p="6"
+              bg="white"
+              borderRadius="2xl"
+              boxShadow="sm"
+              borderWidth="1px"
+              borderColor="gray.100"
+              borderLeft="4px solid"
+              borderLeftColor="red.400"
+            >
+              <Stat>
+                <StatLabel fontSize="xs" color="gray.500" fontWeight="semibold">
+                  รวมรายการหัก
+                </StatLabel>
+                <StatNumber fontSize="2xl" color="red.500" fontWeight="bold">
+                  - ฿{fmt(totals.totalDeductions)}
+                </StatNumber>
+              </Stat>
+            </Box>
+            <Box
+              p="6"
+              bg="white"
+              borderRadius="2xl"
+              boxShadow="sm"
+              borderWidth="1px"
+              borderColor="gray.100"
+              borderLeft="4px solid"
+              borderLeftColor="brand.500"
+            >
+              <Stat>
+                <StatLabel fontSize="xs" color="gray.500" fontWeight="semibold">
+                  รวมยอดสุทธิจ่าย
+                </StatLabel>
+                <StatNumber fontSize="2xl" color="brand.700" fontWeight="bold">
+                  ฿{fmt(totals.netPay)}
+                </StatNumber>
+              </Stat>
+            </Box>
+          </SimpleGrid>
+
+          {/* Payroll Table */}
+          <Box
+            bg="white"
+            borderRadius="2xl"
+            boxShadow="sm"
+            borderWidth="1px"
+            borderColor="gray.100"
+            overflow="hidden"
+          >
+            {loading ? (
+              <Center py="16">
+                <Spinner size="xl" color="brand.500" />
+              </Center>
+            ) : records.length === 0 ? (
+              <Center py="20" flexDirection="column">
+                <Text color="gray.400" mb="4">
+                  ยังไม่มีข้อมูลเงินเดือนงวดนี้
+                </Text>
+                <Button
+                  bg={"#021841"}
+                  color="white"
+                  leftIcon={<Calculator size="16" />}
+                  _hover={{ bg: "#021841" }}
+                  borderRadius="lg"
+                  size="sm"
+                  onClick={handleCalculate}
+                  isLoading={calculating}
+                >
+                  ประมวลผลเงินเดือน
+                </Button>
+              </Center>
+            ) : (
+              <Box
+                overflowX="auto"
+                overflowY="auto"
+                maxH="70vh"
+                borderRadius="xl"
+                border="1px solid"
+                borderColor="gray.100"
+              >
+                <Table variant="simple" size="md">
+                  <Thead
+                    bg="gray.50"
+                    position="sticky"
+                    top={0}
+                    zIndex={1}
+                    boxShadow="sm"
+                  >
+                    <Tr>
+                      <Th
+                        color="gray.500"
+                        fontSize="xs"
                         fontWeight="bold"
-                        color="green.600"
-                        fontSize="sm"
+                        position="sticky"
+                        left={0}
+                        bg="gray.50"
+                        zIndex={2}
                       >
-                        {fmt(record.totalIncome)}
-                      </Td>
-
-                      {/* ภวด.1 */}
-                      <Td
+                        พนักงาน
+                      </Th>
+                      <Th color="gray.500" fontSize="xs" fontWeight="bold">
+                        ประเภท
+                      </Th>
+                      <Th
                         py="4"
-                        isNumeric
-                        fontSize="sm"
-                        color={isParttime ? "gray.300" : "orange.600"}
+                        color="gray.500"
+                        fontSize="xs"
+                        fontWeight="bold"
                       >
-                        {isParttime ? "-" : fmt(record.withholdingTax)}
-                      </Td>
-
-                      {/* ประกันสังคม */}
-                      <Td
-                        py="4"
+                        บริษัท
+                      </Th>
+                      <Th
+                        color="gray.500"
+                        fontSize="xs"
+                        fontWeight="bold"
                         isNumeric
-                        fontSize="sm"
-                        color={isParttime ? "gray.300" : "blue.600"}
                       >
-                        {isParttime ? "-" : fmt(record.socialSecurity)}
-                      </Td>
+                        เงินเดือน
+                      </Th>
+                      <Th
+                        color="#216e4e"
+                        fontSize="xs"
+                        fontWeight="bold"
+                        isNumeric
+                      >
+                        ค่าคอม
+                      </Th>
+                      <Th
+                        color="#216e4e"
+                        fontSize="xs"
+                        fontWeight="bold"
+                        isNumeric
+                      >
+                        Sale
+                      </Th>
+                      <Th
+                        color="#216e4e"
+                        fontSize="xs"
+                        fontWeight="bold"
+                        isNumeric
+                      >
+                        รวมรายได้
+                      </Th>
+                      <Th
+                        color="#ae332d"
+                        fontSize="xs"
+                        fontWeight="bold"
+                        isNumeric
+                      >
+                        ภวด.1
+                      </Th>
+                      <Th
+                        color="#ae332d"
+                        fontSize="xs"
+                        fontWeight="bold"
+                        isNumeric
+                      >
+                        สปส.
+                      </Th>
+                      <Th
+                        color="#ae332d"
+                        fontSize="xs"
+                        fontWeight="bold"
+                        isNumeric
+                      >
+                        <Tooltip label="HR กรอกเอง (เฉพาะประจำ)">
+                          หักอื่นๆ
+                        </Tooltip>
+                      </Th>
+                      <Th
+                        color="#ae332d"
+                        fontSize="xs"
+                        fontWeight="bold"
+                        isNumeric
+                      >
+                        รวมหัก
+                      </Th>
+                      <Th
+                        color="gray.500"
+                        fontSize="xs"
+                        fontWeight="bold"
+                        isNumeric
+                      >
+                        ยอดสุทธิ
+                      </Th>
+                      <Th w="50px"></Th>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    {filteredRecords.map((record) => {
+                      const emp = record.employee;
+                      if (!emp) return null;
+                      const isParttime = record.employmentType === "parttime";
+                      const isEditingThisDeduction =
+                        editingDeductions[record._id] !== undefined;
+                      const isEditingThisSales =
+                        editingSales[record._id] !== undefined;
 
-                      {/* หักอื่นๆ (editable for fulltime only) */}
-                      <Td py="4" isNumeric>
-                        {isParttime ? (
-                          <Tooltip label="Part-time หัก 3% ณ ที่จ่าย">
-                            <Text
-                              fontSize="sm"
-                              color="purple.600"
-                              fontWeight="bold"
+                      return (
+                        <Tr
+                          key={record._id}
+                          bg="white"
+                          _hover={{ bg: "gray.50" }}
+                          transition="background 0.15s"
+                        >
+                          <Td
+                            cursor="pointer"
+                            onClick={() => handleViewDetail(record)}
+                            position="sticky"
+                            left={0}
+                            bg="inherit"
+                            zIndex={1}
+                            borderRight="1px solid"
+                            borderRightColor="gray.100"
+                          >
+                            <Flex align="center">
+                              {/* <Avatar
+                                size="sm"
+                                name={`${emp.firstNameTh} ${emp.lastNameTh}`}
+                                mr="3"
+                                bg="#021841"
+                                color="white"
+                              /> */}
+                              <Box>
+                                <Text
+                                  fontWeight="bold"
+                                  color="gray.800"
+                                  fontSize="sm"
+                                >
+                                  {emp.firstNameTh} {emp.lastNameTh}
+                                </Text>
+                                <Text fontSize="xs" color="gray.400">
+                                  {emp.nickname
+                                    ? `(${emp.nickname})`
+                                    : emp.employeeId}
+                                </Text>
+                              </Box>
+                            </Flex>
+                          </Td>
+                          <Td py="4">
+                            <Badge
+                              bg={isParttime ? "gray.500" : "#021841"}
+                              color="white"
+                              variant="subtle"
+                              borderRadius="full"
+                              px="2"
+                              fontSize="xs"
                             >
-                              {fmt(record.parttimeWithholding)}
-                              <Text
-                                as="span"
-                                fontSize="xx-small"
-                                ml="1"
-                                color="purple.400"
-                              >
-                                (3%)
-                              </Text>
-                            </Text>
-                          </Tooltip>
-                        ) : isEditingThis ? (
-                          <HStack spacing="1" justify="flex-end">
-                            <Input
-                              size="xs"
-                              w="80px"
-                              type="number"
-                              textAlign="right"
-                              borderRadius="md"
-                              value={editingDeductions[record._id]}
-                              onChange={(e) =>
-                                handleDeductionChange(
-                                  record._id,
-                                  e.target.value,
-                                )
-                              }
-                              autoFocus
-                            />
-                            <Button
-                              size="xs"
-                              colorScheme="green"
-                              onClick={() => handleSaveDeduction(record._id)}
+                              {isParttime ? "Part-time" : "ประจำ"}
+                            </Badge>
+                          </Td>
+                          <Td py="4">
+                            <Badge
+                              bg="#2f5855"
+                              color="white"
+                              variant="subtle"
+                              borderRadius="full"
+                              px="2"
+                              fontSize="xx-small"
                             >
-                              <Save size="12" />
-                            </Button>
-                          </HStack>
-                        ) : (
-                          <Text
+                              {record.company || "-"}
+                            </Badge>
+                          </Td>
+                          <Td
+                            py="4"
+                            isNumeric
+                            fontSize="sm"
+                            color="gray.700"
+                            fontWeight="medium"
+                          >
+                            {fmt(record.baseSalary)}
+                          </Td>
+                          <Td
+                            py="4"
+                            isNumeric
                             fontSize="sm"
                             color={
-                              record.otherDeductions > 0
-                                ? "red.500"
-                                : "gray.400"
+                              record.commissionAmount > 0
+                                ? "#216e4e"
+                                : "gray.300"
                             }
-                            cursor="pointer"
-                            _hover={{
-                              color: "brand.600",
-                              textDecoration: "underline",
-                            }}
-                            onClick={() =>
-                              handleDeductionChange(
-                                record._id,
-                                String(record.otherDeductions || 0),
-                              )
+                            fontWeight={
+                              record.commissionAmount > 0 ? "bold" : "normal"
                             }
-                            title="คลิกเพื่อแก้ไข"
+                            cursor={
+                              record.commissionAmount > 0
+                                ? "pointer"
+                                : "default"
+                            }
+                            onClick={() => handleViewCommission(record)}
+                            _hover={
+                              record.commissionAmount > 0
+                                ? {
+                                    textDecoration: "underline",
+                                    color: "#185038",
+                                  }
+                                : {}
+                            }
                           >
-                            {record.otherDeductions > 0
-                              ? fmt(record.otherDeductions)
-                              : "คลิกกรอก"}
-                          </Text>
-                        )}
-                      </Td>
+                            {record.commissionAmount > 0
+                              ? fmt(record.commissionAmount)
+                              : "-"}
+                          </Td>
+                          {/* SALE (editable for fulltime only, similar to otherDeductions) */}
+                          <Td py="4" isNumeric>
+                            {isParttime ? (
+                              <Text fontSize="sm" color="gray.300">
+                                -
+                              </Text>
+                            ) : isEditingThisSales ? (
+                              <HStack spacing="1" justify="flex-end">
+                                <Input
+                                  size="xs"
+                                  w="80px"
+                                  type="number"
+                                  textAlign="right"
+                                  borderRadius="md"
+                                  value={editingSales[record._id]}
+                                  onChange={(e) =>
+                                    handleSalesChange(
+                                      record._id,
+                                      e.target.value,
+                                    )
+                                  }
+                                  autoFocus
+                                />
+                                <Button
+                                  size="xs"
+                                  colorScheme="teal"
+                                  onClick={() => handleSaveSales(record._id)}
+                                >
+                                  <Save size="12" />
+                                </Button>
+                              </HStack>
+                            ) : (
+                              <Text
+                                fontSize="sm"
+                                color={
+                                  record.salesBonus > 0 ? "#216e4e" : "gray.400"
+                                }
+                                fontWeight={
+                                  record.salesBonus > 0 ? "bold" : "normal"
+                                }
+                                cursor="pointer"
+                                _hover={{
+                                  color: "#185038",
+                                  textDecoration: "underline",
+                                }}
+                                onClick={() =>
+                                  handleSalesChange(
+                                    record._id,
+                                    String(record.salesBonus || 0),
+                                  )
+                                }
+                                title="คลิกเพื่อแก้ไข"
+                              >
+                                {record.salesBonus > 0
+                                  ? fmt(record.salesBonus)
+                                  : "คลิกกรอก"}
+                              </Text>
+                            )}
+                          </Td>
+                          <Td
+                            py="4"
+                            isNumeric
+                            fontWeight="bold"
+                            color="#216e4e"
+                            fontSize="sm"
+                          >
+                            {fmt(record.totalIncome)}
+                          </Td>
 
-                      <Td
+                          {/* ภวด.1 */}
+                          <Td
+                            py="4"
+                            isNumeric
+                            fontSize="sm"
+                            color={isParttime ? "gray.300" : "#ae332d"}
+                          >
+                            {isParttime ? "-" : fmt(record.withholdingTax)}
+                          </Td>
+
+                          {/* ประกันสังคม */}
+                          <Td
+                            py="4"
+                            isNumeric
+                            fontSize="sm"
+                            color={isParttime ? "gray.300" : "#ae332d"}
+                          >
+                            {isParttime ? "-" : fmt(record.socialSecurity)}
+                          </Td>
+
+                          {/* หักอื่นๆ (editable for fulltime only) */}
+                          <Td py="4" isNumeric>
+                            {isParttime ? (
+                              <Tooltip label="Part-time หัก 3% ณ ที่จ่าย">
+                                <Text
+                                  fontSize="sm"
+                                  color="purple.600"
+                                  fontWeight="bold"
+                                >
+                                  {fmt(record.parttimeWithholding)}
+                                  <Text
+                                    as="span"
+                                    fontSize="xx-small"
+                                    ml="1"
+                                    color="purple.400"
+                                  >
+                                    (3%)
+                                  </Text>
+                                </Text>
+                              </Tooltip>
+                            ) : isEditingThisDeduction ? (
+                              <HStack spacing="1" justify="flex-end">
+                                <Input
+                                  size="xs"
+                                  w="80px"
+                                  type="number"
+                                  textAlign="right"
+                                  borderRadius="md"
+                                  value={editingDeductions[record._id]}
+                                  onChange={(e) =>
+                                    handleDeductionChange(
+                                      record._id,
+                                      e.target.value,
+                                    )
+                                  }
+                                  autoFocus
+                                />
+                                <Button
+                                  size="xs"
+                                  colorScheme="green"
+                                  onClick={() =>
+                                    handleSaveDeduction(record._id)
+                                  }
+                                >
+                                  <Save size="12" />
+                                </Button>
+                              </HStack>
+                            ) : (
+                              <Text
+                                fontSize="sm"
+                                color={
+                                  record.otherDeductions > 0
+                                    ? "#ae332d"
+                                    : "gray.400"
+                                }
+                                cursor="pointer"
+                                _hover={{
+                                  color: "#8c2924",
+                                  textDecoration: "underline",
+                                }}
+                                onClick={() =>
+                                  handleDeductionChange(
+                                    record._id,
+                                    String(record.otherDeductions || 0),
+                                  )
+                                }
+                                title="คลิกเพื่อแก้ไข"
+                              >
+                                {record.otherDeductions > 0
+                                  ? fmt(record.otherDeductions)
+                                  : "คลิกกรอก"}
+                              </Text>
+                            )}
+                          </Td>
+
+                          <Td
+                            py="4"
+                            isNumeric
+                            fontWeight="bold"
+                            color="#ae332d"
+                            fontSize="sm"
+                          >
+                            - {fmt(record.totalDeductions)}
+                          </Td>
+                          <Td
+                            py="4"
+                            isNumeric
+                            fontWeight="bold"
+                            color="#021841"
+                            fontSize="sm"
+                          >
+                            {fmt(record.netPay)}
+                          </Td>
+                          <Td py="4">
+                            <Button
+                              size="xs"
+                              variant="ghost"
+                              onClick={() => handleViewDetail(record)}
+                            >
+                              <Eye size="14" />
+                            </Button>
+                          </Td>
+                        </Tr>
+                      );
+                    })}
+                  </Tbody>
+                  <Tfoot bg="gray.50">
+                    <Tr>
+                      <Th
+                        colSpan={4}
+                        py="4"
+                        fontSize="sm"
+                        fontWeight="bold"
+                        color="gray.700"
+                        position="sticky"
+                        left={0}
+                        bg="gray.50"
+                        zIndex={1}
+                      >
+                        รวมทั้งหมด ({filteredRecords.length} รายการ)
+                      </Th>
+                      <Th
                         py="4"
                         isNumeric
                         fontWeight="bold"
-                        color="red.500"
+                        color="#216e4e"
                         fontSize="sm"
                       >
-                        - {fmt(record.totalDeductions)}
-                      </Td>
-                      <Td
+                        {fmt(totals.totalIncome)}
+                      </Th>
+                      <Th colSpan={3}></Th>
+                      <Th
                         py="4"
                         isNumeric
                         fontWeight="bold"
-                        color="brand.700"
+                        color="#ae332d"
                         fontSize="sm"
                       >
-                        {fmt(record.netPay)}
-                      </Td>
-                      <Td py="4">
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          onClick={() => handleViewDetail(record)}
-                        >
-                          <Eye size="14" />
-                        </Button>
-                      </Td>
+                        - {fmt(totals.totalDeductions)}
+                      </Th>
+                      <Th
+                        py="4"
+                        isNumeric
+                        fontWeight="bold"
+                        color="#021841"
+                        fontSize="sm"
+                      >
+                        ฿{fmt(totals.netPay)}
+                      </Th>
+                      <Th></Th>
                     </Tr>
-                  );
-                })}
-              </Tbody>
-              <Tfoot bg="gray.50">
-                <Tr>
-                  <Th
-                    colSpan={4}
-                    py="4"
-                    fontSize="sm"
-                    fontWeight="bold"
-                    color="gray.700"
-                  >
-                    รวมทั้งหมด ({filteredRecords.length} รายการ)
-                  </Th>
-                  <Th
-                    py="4"
-                    isNumeric
-                    fontWeight="bold"
-                    color="green.700"
-                    fontSize="sm"
-                  >
-                    {fmt(totals.totalIncome)}
-                  </Th>
-                  <Th colSpan={3}></Th>
-                  <Th
-                    py="4"
-                    isNumeric
-                    fontWeight="bold"
-                    color="red.600"
-                    fontSize="sm"
-                  >
-                    - {fmt(totals.totalDeductions)}
-                  </Th>
-                  <Th
-                    py="4"
-                    isNumeric
-                    fontWeight="bold"
-                    color="brand.700"
-                    fontSize="sm"
-                  >
-                    ฿{fmt(totals.netPay)}
-                  </Th>
-                  <Th></Th>
-                </Tr>
-              </Tfoot>
-            </Table>
+                  </Tfoot>
+                </Table>
+              </Box>
+            )}
           </Box>
-        )}
-      </Box>
-      </Box> {/* Close Tab Content Wrapper Box */}
-      </Tabs> {/* Close Tabs */}
-
+        </Box>{" "}
+        {/* Close Tab Content Wrapper Box */}
+      </Tabs>{" "}
+      {/* Close Tabs */}
       {/* Detail Drawer */}
       <PayrollDetailDrawer
         record={selectedRecord}
         isOpen={isOpen}
         onClose={onClose}
       />
-
       {/* Commission Detail Modal */}
       <CommissionDetailModal
         isOpen={isComOpen}
@@ -1383,6 +1562,7 @@ const Payroll = () => {
             : ""
         }
         period={period}
+        company={selectedCompanyForCom}
       />
     </Box>
   );

@@ -41,6 +41,7 @@ import {
   getStudentCourseHistory,
   updateLesson,
 } from "../services/api";
+import { FaUser } from "react-icons/fa";
 
 const { Title, Text: AntText } = Typography;
 
@@ -293,7 +294,7 @@ const DailyCustomers = () => {
       key: "customerName",
       render: (text) => (
         <Flex align="center" gap="2">
-          <User size="16" />
+          {/* <User size="16" /> */}
           <Text>{text}</Text>
         </Flex>
       ),
@@ -304,7 +305,7 @@ const DailyCustomers = () => {
       key: "coachName",
       render: (text) => (
         <Flex align="center" gap="2">
-          <UserCheck size="16" />
+          {/* <UserCheck size="16" /> */}
           <Text>{text}</Text>
         </Flex>
       ),

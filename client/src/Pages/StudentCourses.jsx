@@ -162,7 +162,9 @@ const CourseDetailView = ({ courseId, onBack }) => {
         mb="4"
         onClick={onBack}
         leftIcon={<ChevronLeft size="16" />}
-        color="gray.600"
+        bg={"#021841"}
+        _hover={{ bg: "#021841" }}
+        color="#FFF"
       >
         กลับไปรายการคอร์ส
       </Button>
@@ -281,9 +283,9 @@ const CourseDetailView = ({ courseId, onBack }) => {
         </Heading>
         <Button
           size="sm"
-          bg="brand.600"
+          bg={"#021841"}
           color="white"
-          _hover={{ bg: "brand.700" }}
+          _hover={{ bg: "#021841" }}
           borderRadius="lg"
           leftIcon={<Plus size="14" />}
           onClick={onOpen}
@@ -527,9 +529,9 @@ const CourseDetailView = ({ courseId, onBack }) => {
               ยกเลิก
             </Button>
             <Button
-              bg="brand.600"
+              bg={"#021841"}
               color="white"
-              _hover={{ bg: "brand.700" }}
+              _hover={{ bg: "#021841" }}
               onClick={handleAddLesson}
             >
               เพิ่ม
@@ -665,9 +667,9 @@ const StudentCourses = () => {
         </Box>
         <Button
           leftIcon={<Plus size="18" />}
-          bg="brand.600"
+          bg="#021841"
           color="white"
-          _hover={{ bg: "brand.700" }}
+          _hover={{ bg: "#021841" }}
           borderRadius="lg"
           px="6"
           boxShadow="sm"
@@ -734,20 +736,13 @@ const StudentCourses = () => {
             <Table variant="simple" size="md">
               <Thead bg="gray.50">
                 <Tr>
-                  <Th
-                    py="3"
-                    color="gray.500"
-                    fontSize="xs"
-                    fontWeight="bold"
-                    w="50px"
-                  >
+                  <Th color="gray.500" fontSize="xs" fontWeight="bold" w="50px">
                     No.
                   </Th>
-                  <Th py="3" color="gray.500" fontSize="xs" fontWeight="bold">
-                    Clients
+                  <Th color="gray.500" fontSize="xs" fontWeight="bold">
+                    Name
                   </Th>
                   <Th
-                    py="3"
                     color="gray.500"
                     fontSize="xs"
                     fontWeight="bold"
@@ -756,7 +751,6 @@ const StudentCourses = () => {
                     Price
                   </Th>
                   <Th
-                    py="3"
                     color="gray.500"
                     fontSize="xs"
                     fontWeight="bold"
@@ -765,7 +759,6 @@ const StudentCourses = () => {
                     จำนวนครั้ง
                   </Th>
                   <Th
-                    py="3"
                     color="gray.500"
                     fontSize="xs"
                     fontWeight="bold"
@@ -774,7 +767,6 @@ const StudentCourses = () => {
                     Vat 7%
                   </Th>
                   <Th
-                    py="3"
                     color="gray.500"
                     fontSize="xs"
                     fontWeight="bold"
@@ -783,36 +775,33 @@ const StudentCourses = () => {
                     Price/Course
                   </Th>
                   <Th
-                    py="3"
                     fontSize="xs"
                     fontWeight="bold"
                     isNumeric
                     color="brand.600"
                   >
-                    Commission %
+                    Commission
                   </Th>
                   <Th
-                    py="3"
                     fontSize="xs"
                     fontWeight="bold"
                     isNumeric
                     color="green.600"
                   >
-                    คอม/ครั้ง
+                    Com/Course
                   </Th>
                   <Th
-                    py="3"
                     fontSize="xs"
                     fontWeight="bold"
                     isNumeric
                     color="blue.600"
                   >
-                    เรียนแล้ว
+                    จำนวนเรียน
                   </Th>
-                  <Th py="3" fontSize="xs" fontWeight="bold" textAlign="center">
+                  <Th fontSize="xs" fontWeight="bold" textAlign="center">
                     สถานะ
                   </Th>
-                  <Th py="3" w="80px"></Th>
+                  <Th w="80px"></Th>
                 </Tr>
               </Thead>
               <Tbody>
@@ -830,7 +819,6 @@ const StudentCourses = () => {
                     }
                   >
                     <Td
-                      py="3"
                       fontSize="sm"
                       color="gray.500"
                       fontWeight="bold"
@@ -931,10 +919,10 @@ const StudentCourses = () => {
                       <Badge
                         colorScheme={
                           c.status === "active"
-                            ? "green"
+                            ? "#2f5855"
                             : c.status === "completed"
-                              ? "blue"
-                              : "red"
+                              ? "#2f5855"
+                              : "#2f5855"
                         }
                         variant="subtle"
                         borderRadius="full"
@@ -954,17 +942,19 @@ const StudentCourses = () => {
                           icon={<Eye size="14" />}
                           size="xs"
                           variant="ghost"
-                          color="gray.500"
+                          color="#FFF"
                           onClick={() => setSelectedCourseId(c._id)}
                           aria-label="ดู"
+                          bg={"#021841"}
                         />
                         <IconButton
                           icon={<Trash2 size="14" />}
                           size="xs"
                           variant="ghost"
-                          color="red.400"
+                          color="#FFF"
                           onClick={() => handleDelete(c._id)}
                           aria-label="ลบ"
+                          bg={"red"}
                         />
                       </HStack>
                     </Td>
@@ -1221,9 +1211,9 @@ const StudentCourses = () => {
               ยกเลิก
             </Button>
             <Button
-              bg="brand.600"
+              bg="#021841"
               color="white"
-              _hover={{ bg: "brand.700" }}
+              _hover={{ bg: "#021841" }}
               onClick={handleAddCourse}
             >
               เพิ่มคอร์ส

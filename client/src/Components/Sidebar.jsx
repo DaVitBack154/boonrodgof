@@ -133,9 +133,9 @@ const Sidebar = ({ onClose }) => {
       </Flex>
 
       <VStack spacing="1" align="stretch">
-        <SectionLabel>หน้าหลัก</SectionLabel>
+        <SectionLabel>Dashboard</SectionLabel>
         <NavItem icon={Calendar} to="/schedule" onClose={onClose}>
-          DashBoard
+          Calendar
         </NavItem>
         <NavItem
           icon={MdOutlineBarChart}
