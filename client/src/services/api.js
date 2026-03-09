@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:5000/api',
+  baseURL: '/api',
   timeout: 10000,
 });
 
@@ -46,6 +46,7 @@ export const calculatePayroll = (period) => api.post('/payroll/calculate', { per
 export const updateDeductions = (id, otherDeductions) => api.put(`/payroll/${id}/deductions`, { otherDeductions }).then(r => r.data);
 export const updateSalesBonus = (id, salesBonus) => api.put(`/payroll/${id}/sales-bonus`, { salesBonus }).then(r => r.data);
 export const getPayrollPeriods = () => api.get('/payroll/periods').then(r => r.data);
+export const getMyPayslip = (employeeId, period) => api.get('/payroll/my-payslip', { params: { employeeId, period } }).then(r => r.data);
 
 // ===== Student Courses =====
 export const getStudentCourses = (params = {}) => api.get('/student-courses', { params }).then(r => r.data);

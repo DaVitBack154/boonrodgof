@@ -60,6 +60,7 @@ import {
   getCommissionDetails,
 } from "../services/api";
 import dayjs from "dayjs";
+import Spinload from "../Components/spinload";
 import "dayjs/locale/th";
 
 dayjs.locale("th");
@@ -328,21 +329,21 @@ const PayrollDetailDrawer = ({ record, isOpen, onClose }) => {
                 label="เงินเดือนฐาน (Base Salary)"
                 value={fmt(record.baseSalary)}
               />
-              <Divider borderColor="gray.200" />
-              <DetailRow
+              {/* <Divider borderColor="gray.200" /> */}
+              {/* <DetailRow
                 label="ค่าตำแหน่ง"
                 value={fmt(record.positionAllowance)}
-              />
-              <Divider borderColor="gray.200" />
-              <DetailRow
+              /> */}
+              {/* <Divider borderColor="gray.200" /> */}
+              {/* <DetailRow
                 label="ค่าครองชีพ"
                 value={fmt(record.livingAllowance)}
-              />
-              <Divider borderColor="gray.200" />
-              <DetailRow
+              /> */}
+              {/* <Divider borderColor="gray.200" /> */}
+              {/* <DetailRow
                 label="ค่าวิชาชีพ"
                 value={fmt(record.professionalAllowance)}
-              />
+              /> */}
               <Divider borderColor="gray.200" />
               <DetailRow
                 label="ค่าคอมมิชชั่น"
@@ -355,6 +356,16 @@ const PayrollDetailDrawer = ({ record, isOpen, onClose }) => {
                 value={fmt(record.salesBonus)}
                 color={record.salesBonus > 0 ? "green.600" : "gray.400"}
               />
+              {record.referralBonus > 0 && (
+                <>
+                  <Divider borderColor="gray.200" />
+                  <DetailRow
+                    label={`ค่าแนะนำลูกค้า (${record.referralCount || 0} คน)`}
+                    value={fmt(record.referralBonus)}
+                    color="green.600"
+                  />
+                </>
+              )}
             </Box>
             <Flex
               justify="space-between"
@@ -480,9 +491,10 @@ const Payroll = () => {
   const [selectedCompanyForCom, setSelectedCompanyForCom] = useState("");
   const [records, setRecords] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [companyFilter, setCompanyFilter] = useState("บริษัทพัฒนา");
+  const [companyFilter, setCompanyFilter] = useState("บุญรอดกอล์ฟพัฒนา");
   const [loading, setLoading] = useState(false);
   const [calculating, setCalculating] = useState(false);
+  const [isSpinning, setIsSpinning] = useState(false);
   const [period, setPeriod] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -509,7 +521,11 @@ const Payroll = () => {
 
   const handleCalculate = async () => {
     setCalculating(true);
+    setIsSpinning(true);
     try {
+      // หน่วงเวลา 2 วินาทีเพื่อให้เห็น Loading Spinner
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
       const result = await calculatePayroll(period);
       setRecords(result.records);
       toast({
@@ -527,6 +543,7 @@ const Payroll = () => {
       });
     }
     setCalculating(false);
+    setIsSpinning(false);
   };
 
   const handleViewDetail = (record) => {
@@ -812,14 +829,14 @@ const Payroll = () => {
       {/* Company Tabs and Enclosed Content */}
       <Tabs
         index={
-          companyFilter === "บริษัทพัฒนา"
+          companyFilter === "บุญรอดกอล์ฟพัฒนา"
             ? 0
-            : companyFilter === "บริษัทTotal"
+            : companyFilter === "บุญรอดกอล์ฟโทเทิล"
               ? 1
               : 2
         }
         onChange={(index) => {
-          const companies = ["บริษัทพัฒนา", "บริษัทTotal", ""];
+          const companies = ["บุญรอดกอล์ฟพัฒนา", "บุญรอดกอล์ฟโทเทิล", ""];
           setCompanyFilter(companies[index]);
         }}
         variant="enclosed"
@@ -1073,27 +1090,33 @@ const Payroll = () => {
                 border="1px solid"
                 borderColor="gray.100"
               >
-                <Table variant="simple" size="md">
-                  <Thead
-                    bg="gray.50"
-                    position="sticky"
-                    top={0}
-                    zIndex={1}
-                    boxShadow="sm"
-                  >
+                <Table variant="simple" size="sm">
+                  <Thead bg="gray.50">
                     <Tr>
                       <Th
                         color="gray.500"
                         fontSize="xs"
                         fontWeight="bold"
                         position="sticky"
+                        top={0}
                         left={0}
                         bg="gray.50"
-                        zIndex={2}
+                        zIndex={3}
+                        boxShadow="sm"
+                        minW="160px"
                       >
                         พนักงาน
                       </Th>
-                      <Th color="gray.500" fontSize="xs" fontWeight="bold">
+                      <Th
+                        color="gray.500"
+                        fontSize="xs"
+                        fontWeight="bold"
+                        position="sticky"
+                        top={0}
+                        bg="gray.50"
+                        zIndex={2}
+                        boxShadow="sm"
+                      >
                         ประเภท
                       </Th>
                       <Th
@@ -1101,6 +1124,11 @@ const Payroll = () => {
                         color="gray.500"
                         fontSize="xs"
                         fontWeight="bold"
+                        position="sticky"
+                        top={0}
+                        bg="gray.50"
+                        zIndex={2}
+                        boxShadow="sm"
                       >
                         บริษัท
                       </Th>
@@ -1109,6 +1137,11 @@ const Payroll = () => {
                         fontSize="xs"
                         fontWeight="bold"
                         isNumeric
+                        position="sticky"
+                        top={0}
+                        bg="gray.50"
+                        zIndex={2}
+                        boxShadow="sm"
                       >
                         เงินเดือน
                       </Th>
@@ -1117,6 +1150,11 @@ const Payroll = () => {
                         fontSize="xs"
                         fontWeight="bold"
                         isNumeric
+                        position="sticky"
+                        top={0}
+                        bg="gray.50"
+                        zIndex={2}
+                        boxShadow="sm"
                       >
                         ค่าคอม
                       </Th>
@@ -1125,6 +1163,11 @@ const Payroll = () => {
                         fontSize="xs"
                         fontWeight="bold"
                         isNumeric
+                        position="sticky"
+                        top={0}
+                        bg="gray.50"
+                        zIndex={2}
+                        boxShadow="sm"
                       >
                         Sale
                       </Th>
@@ -1133,6 +1176,11 @@ const Payroll = () => {
                         fontSize="xs"
                         fontWeight="bold"
                         isNumeric
+                        position="sticky"
+                        top={0}
+                        bg="gray.50"
+                        zIndex={2}
+                        boxShadow="sm"
                       >
                         รวมรายได้
                       </Th>
@@ -1141,6 +1189,11 @@ const Payroll = () => {
                         fontSize="xs"
                         fontWeight="bold"
                         isNumeric
+                        position="sticky"
+                        top={0}
+                        bg="gray.50"
+                        zIndex={2}
+                        boxShadow="sm"
                       >
                         ภวด.1
                       </Th>
@@ -1149,6 +1202,11 @@ const Payroll = () => {
                         fontSize="xs"
                         fontWeight="bold"
                         isNumeric
+                        position="sticky"
+                        top={0}
+                        bg="gray.50"
+                        zIndex={2}
+                        boxShadow="sm"
                       >
                         สปส.
                       </Th>
@@ -1157,6 +1215,11 @@ const Payroll = () => {
                         fontSize="xs"
                         fontWeight="bold"
                         isNumeric
+                        position="sticky"
+                        top={0}
+                        bg="gray.50"
+                        zIndex={2}
+                        boxShadow="sm"
                       >
                         <Tooltip label="HR กรอกเอง (เฉพาะประจำ)">
                           หักอื่นๆ
@@ -1167,6 +1230,11 @@ const Payroll = () => {
                         fontSize="xs"
                         fontWeight="bold"
                         isNumeric
+                        position="sticky"
+                        top={0}
+                        bg="gray.50"
+                        zIndex={2}
+                        boxShadow="sm"
                       >
                         รวมหัก
                       </Th>
@@ -1175,10 +1243,22 @@ const Payroll = () => {
                         fontSize="xs"
                         fontWeight="bold"
                         isNumeric
+                        position="sticky"
+                        top={0}
+                        bg="gray.50"
+                        zIndex={2}
+                        boxShadow="sm"
                       >
                         ยอดสุทธิ
                       </Th>
-                      <Th w="50px"></Th>
+                      <Th
+                        w="50px"
+                        position="sticky"
+                        top={0}
+                        bg="gray.50"
+                        zIndex={2}
+                        boxShadow="sm"
+                      ></Th>
                     </Tr>
                   </Thead>
                   <Tbody>
@@ -1205,17 +1285,9 @@ const Payroll = () => {
                             left={0}
                             bg="inherit"
                             zIndex={1}
-                            borderRight="1px solid"
-                            borderRightColor="gray.100"
+                            minW="160px"
                           >
                             <Flex align="center">
-                              {/* <Avatar
-                                size="sm"
-                                name={`${emp.firstNameTh} ${emp.lastNameTh}`}
-                                mr="3"
-                                bg="#021841"
-                                color="white"
-                              /> */}
                               <Box>
                                 <Text
                                   fontWeight="bold"
@@ -1224,7 +1296,7 @@ const Payroll = () => {
                                 >
                                   {emp.firstNameTh} {emp.lastNameTh}
                                 </Text>
-                                <Text fontSize="xs" color="gray.400">
+                                <Text fontSize="sm" color="gray.400">
                                   {emp.nickname
                                     ? `(${emp.nickname})`
                                     : emp.employeeId}
@@ -1233,16 +1305,9 @@ const Payroll = () => {
                             </Flex>
                           </Td>
                           <Td py="4">
-                            <Badge
-                              bg={isParttime ? "gray.500" : "#021841"}
-                              color="white"
-                              variant="subtle"
-                              borderRadius="full"
-                              px="2"
-                              fontSize="xs"
-                            >
+                            <Text px="2" fontSize="xs" fontWeight="bold">
                               {isParttime ? "Part-time" : "ประจำ"}
-                            </Badge>
+                            </Text>
                           </Td>
                           <Td py="4">
                             <Badge
@@ -1262,6 +1327,7 @@ const Payroll = () => {
                             fontSize="sm"
                             color="gray.700"
                             fontWeight="medium"
+                            whiteSpace="nowrap"
                           >
                             {fmt(record.baseSalary)}
                           </Td>
@@ -1291,6 +1357,7 @@ const Payroll = () => {
                                   }
                                 : {}
                             }
+                            whiteSpace="nowrap"
                           >
                             {record.commissionAmount > 0
                               ? fmt(record.commissionAmount)
@@ -1361,6 +1428,7 @@ const Payroll = () => {
                             fontWeight="bold"
                             color="#216e4e"
                             fontSize="sm"
+                            whiteSpace="nowrap"
                           >
                             {fmt(record.totalIncome)}
                           </Td>
@@ -1371,6 +1439,7 @@ const Payroll = () => {
                             isNumeric
                             fontSize="sm"
                             color={isParttime ? "gray.300" : "#ae332d"}
+                            whiteSpace="nowrap"
                           >
                             {isParttime ? "-" : fmt(record.withholdingTax)}
                           </Td>
@@ -1381,6 +1450,7 @@ const Payroll = () => {
                             isNumeric
                             fontSize="sm"
                             color={isParttime ? "gray.300" : "#ae332d"}
+                            whiteSpace="nowrap"
                           >
                             {isParttime ? "-" : fmt(record.socialSecurity)}
                           </Td>
@@ -1466,6 +1536,7 @@ const Payroll = () => {
                             fontWeight="bold"
                             color="#ae332d"
                             fontSize="sm"
+                            whiteSpace="nowrap"
                           >
                             - {fmt(record.totalDeductions)}
                           </Td>
@@ -1475,6 +1546,7 @@ const Payroll = () => {
                             fontWeight="bold"
                             color="#021841"
                             fontSize="sm"
+                            whiteSpace="nowrap"
                           >
                             {fmt(record.netPay)}
                           </Td>
@@ -1503,6 +1575,7 @@ const Payroll = () => {
                         left={0}
                         bg="gray.50"
                         zIndex={1}
+                        minW="180px"
                       >
                         รวมทั้งหมด ({filteredRecords.length} รายการ)
                       </Th>
@@ -1522,6 +1595,7 @@ const Payroll = () => {
                         fontWeight="bold"
                         color="#ae332d"
                         fontSize="sm"
+                        whiteSpace="nowrap"
                       >
                         - {fmt(totals.totalDeductions)}
                       </Th>
@@ -1564,6 +1638,7 @@ const Payroll = () => {
         period={period}
         company={selectedCompanyForCom}
       />
+      {isSpinning && <Spinload />}
     </Box>
   );
 };

@@ -7,9 +7,9 @@ const Employee = require('../models/Employee');
 // POST /api/student-courses/test-lesson - สร้าง lesson สำหรับลูกค้าทดลองเรียน (Test)
 router.post('/test-lesson', async (req, res) => {
   try {
-    const { testCustomerName, coach, lessonDate, referredBy } = req.body;
-    if (!testCustomerName || !coach || !lessonDate) {
-      return res.status(400).json({ error: 'กรุณากรอกข้อมูลให้ครบ (ชื่อลูกค้า, โค้ช, วันที่)' });
+    const { testCustomerName, coach, lessonDate, referredBy, company, branch } = req.body;
+    if (!testCustomerName || !coach || !lessonDate || !company || !branch) {
+      return res.status(400).json({ error: 'กรุณากรอกข้อมูลให้ครบ (ชื่อลูกค้า, โค้ช, วันที่, บริษัท, สาขา)' });
     }
 
     // ตรวจสอบว่าโค้ชมีสอนเวลานี้หรือยัง (ห้ามจองทับ)
@@ -33,13 +33,16 @@ router.post('/test-lesson', async (req, res) => {
       status: 'test',
       testCustomerName,
       referredBy: referredBy || undefined,
+      company,
+      branch
     });
 
     await lesson.save();
 
     const populated = await LessonRecord.findById(lesson._id)
       .populate('coach', 'employeeId firstNameTh lastNameTh nickname position')
-      .populate('referredBy', 'firstNameTh lastNameTh nickname');
+      .populate('referredBy', 'firstNameTh lastNameTh nickname')
+      .populate('branch', 'name');
     res.status(201).json(populated);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -99,8 +102,35 @@ router.get('/:id/history', async (req, res) => {
 // POST /api/student-courses - เพิ่มคอร์สลูกค้าใหม่
 router.post('/', async (req, res) => {
   try {
-    const course = new StudentCourse(req.body);
+    const { legacyLessons, ...courseData } = req.body;
+    const course = new StudentCourse(courseData);
+    
+    // ถ้ามีการระบุว่าเรียนมาแล้วกี่ครั้ง
+    const legacyCount = parseInt(legacyLessons, 10);
+    if (!isNaN(legacyCount) && legacyCount > 0) {
+      course.lessonsCompleted = Math.min(legacyCount, course.totalLessons);
+    }
+    
     await course.save();
+
+    // สร้างบันทึกจำลองสำหรับ legacy lessons
+    if (!isNaN(legacyCount) && legacyCount > 0) {
+      const dummyRecords = [];
+      const len = Math.min(legacyCount, course.totalLessons);
+      for (let i = 1; i <= len; i++) {
+        dummyRecords.push({
+          studentCourse: course._id,
+          lessonNumber: i,
+          lessonDate: course.startDate || Date.now(),
+          status: 'legacy',
+          notes: 'ข้อมูลยกมาจากระบบเก่า',
+          company: course.company,
+          // ไม่มี coach และไม่มี commission
+        });
+      }
+      await LessonRecord.insertMany(dummyRecords);
+    }
+
     const populated = await StudentCourse.findById(course._id).populate('branch', 'name code');
     res.status(201).json(populated);
   } catch (err) {
@@ -260,16 +290,18 @@ router.put('/:courseId/lessons/:lessonId', async (req, res) => {
 
     if (!lesson) return res.status(404).json({ error: 'ไม่พบข้อมูลบันทึกการเรียน' });
 
-    // Update lessonsCompleted count
-    const course = await StudentCourse.findById(req.params.courseId);
-    if (course) {
-      const completedCount = await LessonRecord.countDocuments({
-        studentCourse: course._id,
-        status: 'completed',
-      });
-      course.lessonsCompleted = completedCount;
-      course.status = completedCount >= course.totalLessons ? 'completed' : 'active';
-      await course.save();
+    // Update lessonsCompleted count if not a standalone test lesson
+    if (req.params.courseId !== 'standalone') {
+      const course = await StudentCourse.findById(req.params.courseId);
+      if (course) {
+        const completedCount = await LessonRecord.countDocuments({
+          studentCourse: course._id,
+          status: 'completed',
+        });
+        course.lessonsCompleted = completedCount;
+        course.status = completedCount >= course.totalLessons ? 'completed' : 'active';
+        await course.save();
+      }
     }
 
     res.json(lesson);
@@ -283,16 +315,18 @@ router.delete('/:courseId/lessons/:lessonId', async (req, res) => {
   try {
     await LessonRecord.findByIdAndDelete(req.params.lessonId);
 
-    // Update lessonsCompleted count
-    const course = await StudentCourse.findById(req.params.courseId);
-    if (course) {
-      const completedCount = await LessonRecord.countDocuments({
-        studentCourse: course._id,
-        status: 'completed',
-      });
-      course.lessonsCompleted = completedCount;
-      course.status = completedCount >= course.totalLessons ? 'completed' : 'active';
-      await course.save();
+    // Update lessonsCompleted count if not a standalone test lesson
+    if (req.params.courseId !== 'standalone') {
+      const course = await StudentCourse.findById(req.params.courseId);
+      if (course) {
+        const completedCount = await LessonRecord.countDocuments({
+          studentCourse: course._id,
+          status: 'completed',
+        });
+        course.lessonsCompleted = completedCount;
+        course.status = completedCount >= course.totalLessons ? 'completed' : 'active';
+        await course.save();
+      }
     }
 
     res.json({ message: 'ลบเรียบร้อย' });

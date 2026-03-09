@@ -5,6 +5,8 @@ import {
   Text,
   Center,
   Spinner as ChakraSpinner,
+  Avatar,
+  Badge,
 } from "@chakra-ui/react";
 import {
   Table,
@@ -156,12 +158,18 @@ const DailyCustomers = () => {
     setHistoryLoading(false);
   };
 
-  // กรองข้อมูลด้วยคำค้นหา
-  const filteredData = data.filter(
-    (item) =>
-      item.customerName.toLowerCase().includes(searchText.toLowerCase()) ||
-      item.coachName.toLowerCase().includes(searchText.toLowerCase()),
-  );
+  // กรองข้อมูล และ เรียงลำดับตามวันที่ล่าสุดอยู่บนสุด
+  const filteredData = data
+    .filter(
+      (item) =>
+        item.status !== "legacy" &&
+        (item.customerName.toLowerCase().includes(searchText.toLowerCase()) ||
+          item.coachName.toLowerCase().includes(searchText.toLowerCase())),
+    )
+    .sort(
+      (a, b) =>
+        dayjs(b.lesson.lessonDate).unix() - dayjs(a.lesson.lessonDate).unix(),
+    );
 
   const handleExport = async () => {
     setIsExporting(true);
@@ -266,11 +274,11 @@ const DailyCustomers = () => {
             title: "วันที่",
             dataIndex: "date",
             key: "date",
-            width: 130,
+            width: 110,
             render: (text) => (
               <Flex align="center" gap="2">
                 <Calendar size="14" />
-                <Text>{text}</Text>
+                <Text fontSize="13px">{text}</Text>
               </Flex>
             ),
           },
@@ -280,11 +288,11 @@ const DailyCustomers = () => {
       title: "เวลา",
       dataIndex: "time",
       key: "time",
-      width: 120,
+      width: 100,
       render: (text) => (
         <Flex align="center" gap="2" noWrap>
           <Clock size="13" />
-          <Text>{text} น.</Text>
+          <Text fontSize="13px">{text} น.</Text>
         </Flex>
       ),
     },
@@ -292,10 +300,10 @@ const DailyCustomers = () => {
       title: "ชื่อลูกค้า",
       dataIndex: "customerName",
       key: "customerName",
+      width: 150,
       render: (text) => (
         <Flex align="center" gap="2">
-          {/* <User size="16" /> */}
-          <Text>{text}</Text>
+          <Text fontSize="13px">{text}</Text>
         </Flex>
       ),
     },
@@ -303,22 +311,27 @@ const DailyCustomers = () => {
       title: "โค้ชผู้สอน",
       dataIndex: "coachName",
       key: "coachName",
+      width: 140,
       render: (text) => (
         <Flex align="center" gap="2">
-          {/* <UserCheck size="16" /> */}
-          <Text>{text}</Text>
+          <Text fontSize="13px">{text}</Text>
         </Flex>
       ),
     },
     {
       title: "ครั้งที่เรียน",
       key: "lessonNumber",
+      width: 100,
       render: (_, record) => {
         if (record.status === "test") {
-          return <Text color="gray.600">ครั้งที่ 1</Text>;
+          return (
+            <Text color="gray.600" fontSize="13px">
+              ครั้งที่ 1
+            </Text>
+          );
         }
         return (
-          <Text color="gray.600">
+          <Text color="gray.600" fontSize="13px">
             ครั้งที่ {record.lessonNumber}{" "}
             <Text as="span" color="gray.400">
               / {record.totalLessons}
@@ -331,6 +344,7 @@ const DailyCustomers = () => {
       title: "สถานะ",
       dataIndex: "status",
       key: "status",
+      width: 130,
       render: (status) => <StatusBadge status={status} />,
     },
     // {
@@ -509,6 +523,7 @@ const DailyCustomers = () => {
             }}
             bordered
             size="small"
+            scroll={{ x: "max-content" }}
           />
         </ConfigProvider>
       </Box>
@@ -519,7 +534,7 @@ const DailyCustomers = () => {
         open={isModalOpen}
         onCancel={() => setIsModalOpen(false)}
         footer={null}
-        width={600}
+        width={900}
         destroyOnClose
       >
         {historyLoading ? (
@@ -537,7 +552,7 @@ const DailyCustomers = () => {
               borderColor="gray.100"
             >
               <Box p="3" bg="blue.50" borderRadius="full" color="blue.500">
-                <User size="24" />
+                <FaUser size="24" />
               </Box>
               <Box>
                 <Title level={4} style={{ margin: 0 }}>
@@ -550,53 +565,93 @@ const DailyCustomers = () => {
               </Box>
             </Flex>
 
-            <Box
-              maxH="60vh"
-              overflowY="auto"
-              pr="4"
-              className="custom-scrollbar"
-            >
-              <Timeline
-                mode="left"
-                items={courseHistory.map((lesson) => {
-                  const isFuture = dayjs(lesson.lessonDate).isAfter(dayjs());
-                  let color = "blue";
-                  if (lesson.status === "completed") color = "green";
-                  if (lesson.status === "cancelled") color = "gray";
-                  if (lesson.status === "no_show") color = "red";
-                  if (isFuture && lesson.status === "completed") color = "blue"; // Override สำหรับคลาสที่ยังมาไม่ถึงแต่วน loop มาให้เป็น completed
-
-                  return {
-                    color: color,
-                    label: dayjs(lesson.lessonDate).format("DD MMM YYYY HH:mm"),
-                    children: (
-                      <Box
-                        bg="gray.50"
-                        p="3"
-                        borderRadius="lg"
-                        mb="2"
-                        borderWidth="1px"
-                        borderColor="gray.200"
-                      >
-                        <Flex justify="space-between" align="center" mb="1">
-                          <Text fontWeight="bold" color="gray.800">
-                            ครั้งที่ {lesson.lessonNumber}
-                          </Text>
-                          <StatusBadge status={lesson.status} />
-                        </Flex>
-                        <Flex align="center" gap="2">
-                          <UserCheck size="14" color="#718096" />
-                          <Text fontSize="sm" color="gray.600">
-                            โค้ช:{" "}
-                            {lesson.coach
-                              ? `${lesson.coach.firstNameTh} (${lesson.coach.nickname || ""})`
-                              : "ไม่ระบุ"}
-                          </Text>
-                        </Flex>
-                      </Box>
+            <Box maxH="65vh" overflowY="auto" className="custom-scrollbar">
+              <Table
+                dataSource={[...courseHistory].sort(
+                  (a, b) => (b.lessonNumber || 0) - (a.lessonNumber || 0),
+                )}
+                pagination={false}
+                scroll={{ x: "max-content" }}
+                columns={[
+                  {
+                    title: "ครั้งที่",
+                    dataIndex: "lessonNumber",
+                    key: "lessonNumber",
+                    width: 70,
+                    render: (num) => (
+                      <Text fontWeight="bold" color="blue.500" fontSize="13px">
+                        #{num}
+                      </Text>
                     ),
-                  };
-                })}
+                  },
+                  {
+                    title: "วันที่เรียน",
+                    dataIndex: "lessonDate",
+                    key: "lessonDate",
+                    width: 160,
+                    render: (date) => (
+                      <Flex align="center" gap="2" color="gray.600">
+                        <Clock size="14" />
+                        <Text fontSize="13px">
+                          {dayjs(date).format("DD/MM/YY HH:mm")}
+                        </Text>
+                      </Flex>
+                    ),
+                  },
+                  {
+                    title: "เทรนเนอร์",
+                    dataIndex: "coach",
+                    key: "coach",
+                    width: 130,
+                    render: (coach) => (
+                      <Flex align="center" gap="2">
+                        {coach ? (
+                          <Box>
+                            <Text fontSize="13px" fontWeight="medium">
+                              {coach.firstNameTh}
+                            </Text>
+                            <Text fontSize="11px" color="gray.400">
+                              ({coach.nickname || "โปร"})
+                            </Text>
+                          </Box>
+                        ) : (
+                          <Text color="gray.400">-</Text>
+                        )}
+                      </Flex>
+                    ),
+                  },
+                  {
+                    title: "สถานะ",
+                    dataIndex: "status",
+                    key: "status",
+                    width: 130,
+                    render: (status) => {
+                      const colors = {
+                        completed: { bg: "green.50", text: "green.600" },
+                        active: { bg: "orange.50", text: "orange.600" },
+                        no_show: { bg: "red.50", text: "red.600" },
+                      };
+                      const style = colors[status] || {
+                        bg: "gray.50",
+                        text: "gray.600",
+                      };
+                      return (
+                        <Badge
+                          px="3"
+                          py="1"
+                          borderRadius="full"
+                          bg={style.bg}
+                          color={style.text}
+                          fontSize="11px"
+                          variant="subtle"
+                          textTransform="none"
+                        >
+                          {STATUS_LABELS[status] || "ข้อมูลก่อนเข้าระบบ"}
+                        </Badge>
+                      );
+                    },
+                  },
+                ]}
               />
               {courseHistory.length === 0 && (
                 <Empty description="ไม่มีประวัติการเรียน" />

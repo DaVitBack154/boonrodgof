@@ -45,11 +45,31 @@ function calculateWithholdingTax(annualIncome) {
 }
 
 /**
- * คำนวณประกันสังคม
+ * คำนวณประกันสังคม (หัก 5%) แบบปรับฐานตามปีปฏิทิน
+ * ปัจจุบัน: ฐานสูงสุด 15,000 (แม็กซ์ 750)
+ * 2569-2571 (2026-2028): ฐานสูงสุด 17,500 (แม็กซ์ 875)
+ * 2572-2574 (2029-2031): ฐานสูงสุด 20,000 (แม็กซ์ 1000)
+ * 2575 เป็นต้นไป (2032+): ฐานสูงสุด 23,000 (แม็กซ์ 1150)
+ * 
+ * @param {number} baseSalary - เงินเดือนฐาน
+ * @param {string} period - งวดเงินเดือน 'YYYY-MM'
  */
-function calculateSocialSecurity(baseSalary) {
-  const amount = baseSalary * SOCIAL_SECURITY_RATE;
-  return Math.min(amount, SOCIAL_SECURITY_CAP);
+function calculateSocialSecurity(baseSalary, period) {
+  const [yearStr] = period ? period.split('-') : [new Date().getFullYear().toString()];
+  const year = parseInt(yearStr);
+  
+  let maxSalaryBase = 15000; // ค่าเริ่มต้นก่อนปี 2026
+
+  if (year >= 2032) {
+    maxSalaryBase = 23000;
+  } else if (year >= 2029) {
+    maxSalaryBase = 20000;
+  } else if (year >= 2026) {
+    maxSalaryBase = 17500;
+  }
+
+  const cappedSalary = Math.min(baseSalary, maxSalaryBase);
+  return Math.round(cappedSalary * SOCIAL_SECURITY_RATE * 100) / 100;
 }
 
 /**
@@ -58,15 +78,17 @@ function calculateSocialSecurity(baseSalary) {
  * @param {number} existingOtherDeductions - หักอื่นๆ (HR กรอก)
  * @param {number} commissionAmount - ค่าคอมมิชชั่น (คำนวณจาก lessons)
  * @param {number} salesBonus - sale พิเศษ (HR กรอก)
+ * @param {number} referralBonus - ค่าแนะนำลูกค้า Test (100 บาท/คน)
+ * @param {string} period - งวดเงินเดือน 'YYYY-MM' (สำหรับเช็คฐานประกันสังคมตามปี)
  */
-function calculatePayroll(employee, existingOtherDeductions = 0, commissionAmount = 0, salesBonus = 0) {
+function calculatePayroll(employee, existingOtherDeductions = 0, commissionAmount = 0, salesBonus = 0, referralBonus = 0, period = null) {
   const baseSalary = employee.baseSalary || 0;
   const livingAllowance = employee.livingAllowance || 0;
   const positionAllowance = employee.positionAllowance || 0;
   const professionalAllowance = employee.professionalAllowance || 0;
   
-  // รวมรายได้ = เงินเดือน + เบี้ยเลี้ยง + ค่าคอม + Sale
-  const totalIncome = baseSalary + livingAllowance + positionAllowance + professionalAllowance + commissionAmount + salesBonus;
+  // รวมรายได้ = เงินเดือน + เบี้ยเลี้ยง + ค่าคอม + Sale + ค่าแนะนำ
+  const totalIncome = baseSalary + livingAllowance + positionAllowance + professionalAllowance + commissionAmount + salesBonus + referralBonus;
   
   let withholdingTax = 0;
   let socialSecurity = 0;
@@ -85,7 +107,7 @@ function calculatePayroll(employee, existingOtherDeductions = 0, commissionAmoun
     withholdingTax = calculateWithholdingTax(annualIncome);
     
     if (employee.socialSecurityEnabled) {
-      socialSecurity = calculateSocialSecurity(baseSalary);
+      socialSecurity = calculateSocialSecurity(baseSalary, period);
     }
     
     totalDeductions = withholdingTax + socialSecurity + otherDeductions;
@@ -101,6 +123,7 @@ function calculatePayroll(employee, existingOtherDeductions = 0, commissionAmoun
     otAmount: 0,
     commissionAmount,
     salesBonus,
+    referralBonus,
     totalIncome,
     withholdingTax,
     socialSecurity,

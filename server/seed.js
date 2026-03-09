@@ -50,20 +50,20 @@ async function seed() {
     const parseCompanies = (companyStr) => {
       if (companyStr === 'กรรมการบริษัท') {
         return [
-          { company: 'บริษัทพัฒนา', employmentType: 'fulltime' },
-          { company: 'บริษัทTotal', employmentType: 'fulltime' },
+          { company: 'บุญรอดกอล์ฟพัฒนา', employmentType: 'fulltime' },
+          { company: 'บุญรอดกอล์ฟโทเทิล', employmentType: 'fulltime' },
         ];
       }
       const parts = companyStr.split(',').map(s => s.trim());
       if (parts.length === 2) {
         return [
-          { company: 'บริษัทพัฒนา', employmentType: parts[0].includes('พาร์ทไทม์') ? 'parttime' : 'fulltime' },
-          { company: 'บริษัทTotal', employmentType: parts[1].includes('พาร์ทไทม์') ? 'parttime' : 'fulltime' },
+          { company: 'บุญรอดกอล์ฟพัฒนา', employmentType: parts[0].includes('พาร์ทไทม์') ? 'parttime' : 'fulltime' },
+          { company: 'บุญรอดกอล์ฟโทเทิล', employmentType: parts[1].includes('พาร์ทไทม์') ? 'parttime' : 'fulltime' },
         ];
       }
       // single company
       return [
-        { company: 'บริษัทพัฒนา', employmentType: parts[0].includes('พาร์ทไทม์') ? 'parttime' : 'fulltime' },
+        { company: 'บุญรอดกอล์ฟพัฒนา', employmentType: parts[0].includes('พาร์ทไทม์') ? 'parttime' : 'fulltime' },
       ];
     };
 

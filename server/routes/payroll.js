@@ -84,7 +84,7 @@ router.post('/calculate', async (req, res) => {
       // กำหนดรายชื่อบริษัทที่พนักงานอยู่
       const companyList = emp.companies && emp.companies.length > 0
         ? emp.companies
-        : [{ company: 'บริษัทพัฒนา', employmentType: emp.employmentType || 'fulltime' }];
+        : [{ company: 'บุญรอดกอล์ฟพัฒนา', employmentType: emp.employmentType || 'fulltime' }];
 
       // track ว่าจ่าย baseSalary ไปหรือยัง (จ่ายเฉพาะบริษัทแรก)
       let baseSalaryPaid = false;
@@ -104,6 +104,24 @@ router.post('/calculate', async (req, res) => {
         
         // เงินเดือนฐานจ่ายเฉพาะบริษัทแรกที่เป็นประจำ (หรือบริษัทแรก)
         const shouldPayBase = !baseSalaryPaid && (compEmpType === 'fulltime' || companyList.length === 1);
+
+        // คำนวณค่าแนะนำลูกค้า Test (100 บาท/คน) - เฉพาะบริษัทแรก
+        let referralBonus = 0;
+        let referralCount = 0;
+        if (shouldPayBase) {
+          const [yr, mn] = period.split('-');
+          const refStart = new Date(yr, parseInt(mn) - 2, 26);
+          refStart.setHours(0, 0, 0, 0);
+          const refEnd = new Date(yr, parseInt(mn) - 1, 25);
+          refEnd.setHours(23, 59, 59, 999);
+
+          referralCount = await LessonRecord.countDocuments({
+            referredBy: emp._id,
+            status: { $in: ['completed', 'test'] },
+            lessonDate: { $gte: refStart, $lte: refEnd },
+          });
+          referralBonus = referralCount * 100;
+        }
         
         // สร้าง employee object จำลองเพื่อส่งเข้า calculator
         const empForCalc = {
@@ -118,12 +136,13 @@ router.post('/calculate', async (req, res) => {
 
         if (shouldPayBase) baseSalaryPaid = true;
 
-        // คำนวณ payroll (รวมค่าคอม + sale)
-        const calc = calculatePayroll(empForCalc, existingOtherDeductions, commissionAmount, existingSalesBonus);
+        // คำนวณ payroll (รวมค่าคอม + sale + ค่าแนะนำ)
+        const calc = calculatePayroll(empForCalc, existingOtherDeductions, commissionAmount, existingSalesBonus, referralBonus, period);
 
         if (existing) {
           Object.assign(existing, calc, { 
             period, periodLabel, company: companyName,
+            referralCount,
             status: 'calculated',
             calculatedAt: new Date()
           });
@@ -134,6 +153,7 @@ router.post('/calculate', async (req, res) => {
             employee: emp._id,
             period, periodLabel,
             company: companyName,
+            referralCount,
             ...calc,
             status: 'calculated',
             calculatedAt: new Date(),
@@ -168,13 +188,11 @@ router.put('/:id/deductions', async (req, res) => {
 
     record.otherDeductions = otherDeductions || 0;
 
-    if (record.employmentType === 'parttime') {
-      record.totalDeductions = record.parttimeWithholding;
-    } else {
-      record.totalDeductions = record.withholdingTax + record.socialSecurity + record.otherDeductions;
-    }
-    record.netPay = Math.round((record.totalIncome - record.totalDeductions) * 100) / 100;
-
+    const employee = await Employee.findById(record.employee);
+    // Recalculate everything to update net pay accurately (and also SSO cap if year matters)
+    const calc = calculatePayroll(employee, record.otherDeductions, record.commissionAmount, record.salesBonus || 0, record.referralBonus || 0, record.period);
+    Object.assign(record, calc);
+    record.calculatedAt = new Date();
     await record.save();
 
     const populated = await PayrollRecord.findById(record._id)
@@ -199,8 +217,8 @@ router.put('/:id/sales-bonus', async (req, res) => {
     const employee = await Employee.findById(record.employee);
     if (!employee) return res.status(404).json({ error: 'ไม่พบข้อมูลพนักงาน' });
 
-    // Recalculate with updated sales bonus
-    const calc = calculatePayroll(employee, record.otherDeductions, record.commissionAmount, salesBonus || 0);
+    // Recalculate with updated sales bonus (preserve existing referralBonus and period)
+    const calc = calculatePayroll(employee, record.otherDeductions, record.commissionAmount, salesBonus || 0, record.referralBonus || 0, record.period);
     Object.assign(record, calc);
     record.calculatedAt = new Date();
     await record.save();
@@ -348,6 +366,28 @@ router.get('/periods', async (req, res) => {
     }).sort((a, b) => b.value.localeCompare(a.value));
     
     res.json(periodList);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+// GET /api/payroll/my-payslip?employeeId=xxx&period=YYYY-MM - ดึง payslip ของพนักงาน
+router.get('/my-payslip', async (req, res) => {
+  try {
+    const { employeeId, period } = req.query;
+    if (!employeeId || !period) {
+      return res.status(400).json({ error: 'กรุณาระบุ employeeId และ period' });
+    }
+
+    const records = await PayrollRecord.find({ employee: employeeId, period })
+      .populate({
+        path: 'employee',
+        populate: { path: 'branch', select: 'name code type' }
+      });
+
+    const employee = await Employee.findById(employeeId)
+      .populate('branch', 'name code type');
+
+    res.json({ records, employee });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

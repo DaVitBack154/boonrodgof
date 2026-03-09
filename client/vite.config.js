@@ -11,10 +11,16 @@ export default defineConfig({
   ],
   server: {
     host: true, // สำคัญมาก ให้เข้าจากภายนอกได้
-    port: 5173, // จะใช้ port อะไรก็ได้
+    port: 3200, // จะใช้ port อะไรก็ได้
     strictPort: true, // ถ้า port นี้ถูกใช้ จะ error เลย
     allowedHosts: [
-      'babe-58-8-175-83.ngrok-free.app', // ใส่ domain ngrok
+      'fbbe-49-0-85-37.ngrok-free.app', // ใส่ domain ngrok (ลบ https:// ออก)
     ],
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5000', // URL ของ Backend
+        changeOrigin: true,
+      },
+    },
   },
 });

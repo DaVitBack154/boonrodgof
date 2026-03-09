@@ -4,7 +4,7 @@ const payrollRecordSchema = new mongoose.Schema({
   employee: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee', required: true },
   period: { type: String, required: true },          // e.g. "2024-02"
   periodLabel: { type: String, required: true },      // e.g. "กุมภาพันธ์ 2024"
-  company: { type: String, enum: ['บริษัทพัฒนา', 'บริษัทTotal'], required: true },
+  company: { type: String, enum: ['บุญรอดกอล์ฟพัฒนา', 'บุญรอดกอล์ฟโทเทิล'], required: true },
 
   // รายได้
   baseSalary: { type: Number, default: 0 },
@@ -14,6 +14,8 @@ const payrollRecordSchema = new mongoose.Schema({
   otAmount: { type: Number, default: 0 },
   commissionAmount: { type: Number, default: 0 },    // ค่าคอมมิชชั่น (คำนวณจาก lessons)
   salesBonus: { type: Number, default: 0 },           // sale พิเศษ (HR กรอก)
+  referralBonus: { type: Number, default: 0 },        // ค่าแนะนำลูกค้า Test (100 บาท/คน)
+  referralCount: { type: Number, default: 0 },        // จำนวนลูกค้า Test ที่แนะนำ
   totalIncome: { type: Number, default: 0 },
 
   // รายการหัก (คำนวณอัตโนมัติ สำหรับ fulltime)

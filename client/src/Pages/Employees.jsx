@@ -909,7 +909,7 @@ const Employees = () => {
   const [loading, setLoading] = useState(true);
   const [filterBranch, setFilterBranch] = useState("");
   const [filterType, setFilterType] = useState("");
-  const [companyFilter, setCompanyFilter] = useState("บริษัทพัฒนา");
+  const [companyFilter, setCompanyFilter] = useState("บุญรอดกอล์ฟพัฒนา");
   const [searchText, setSearchText] = useState("");
   const toast = useToast();
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -1057,14 +1057,14 @@ const Employees = () => {
       {/* Company Tabs */}
       <Tabs
         index={
-          companyFilter === "บริษัทพัฒนา"
+          companyFilter === "บุญรอดกอล์ฟพัฒนา"
             ? 0
-            : companyFilter === "บริษัทTotal"
+            : companyFilter === "บุญรอดกอล์ฟโทเทิล"
               ? 1
               : 2
         }
         onChange={(index) => {
-          const companies = ["บริษัทพัฒนา", "บริษัทTotal", ""];
+          const companies = ["บุญรอดกอล์ฟพัฒนา", "บุญรอดกอล์ฟโทเทิล", ""];
           setCompanyFilter(companies[index]);
         }}
         variant="enclosed"

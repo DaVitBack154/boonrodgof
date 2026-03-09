@@ -1,19 +1,16 @@
-import {
-  Box,
-  Flex,
-  Drawer,
-  DrawerOverlay,
-  DrawerContent,
-  useDisclosure,
-} from "@chakra-ui/react";
+import { Box, Flex } from "@chakra-ui/react";
+import { Drawer as AntDrawer } from "antd";
 import { Outlet, useNavigate } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Sidebar from "../Components/Sidebar";
 import Topbar from "../Components/Topbar";
 
 const MainLayout = () => {
   const navigate = useNavigate();
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const [isOpen, setIsOpen] = useState(false);
+
+  const onOpen = () => setIsOpen(true);
+  const onClose = () => setIsOpen(false);
 
   useEffect(() => {
     const user = localStorage.getItem("user");
@@ -29,13 +26,25 @@ const MainLayout = () => {
         <Sidebar />
       </Box>
 
-      {/* Mobile Drawer Sidebar */}
-      <Drawer isOpen={isOpen} placement="left" onClose={onClose}>
-        <DrawerOverlay />
-        <DrawerContent bg="brand.900" maxW="260px">
-          <Sidebar onClose={onClose} />
-        </DrawerContent>
-      </Drawer>
+      {/* Mobile Drawer Sidebar - Ant Design */}
+      <AntDrawer
+        placement="left"
+        onClose={onClose}
+        open={isOpen}
+        width={260}
+        styles={{
+          body: {
+            padding: 0,
+            background: "#021841", // brand.900 equivalent
+          },
+          header: {
+            display: "none",
+          },
+        }}
+        closable={false}
+      >
+        <Sidebar onClose={onClose} />
+      </AntDrawer>
 
       {/* Main Content Area - Takes remaining width */}
       <Flex flex="1" direction="column" overflow="hidden" minW="0">

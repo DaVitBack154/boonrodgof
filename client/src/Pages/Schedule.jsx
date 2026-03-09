@@ -30,6 +30,7 @@ import {
   IconButton,
 } from "@chakra-ui/react";
 import { Modal, Form, Select as AntSelect, DatePicker, message } from "antd";
+import Spinload from "../Components/spinload";
 import dayjs from "dayjs";
 import {
   Calendar,
@@ -139,6 +140,7 @@ const Schedule = () => {
   const [viewMode, setViewMode] = useState("daily"); // "daily" | "monthly"
   const [branches, setBranches] = useState([]);
   const [selectedBranch, setSelectedBranch] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   const dateObj = new Date(selectedDate + "T00:00:00");
   const monthStr = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, "0")}`;
@@ -223,7 +225,11 @@ const Schedule = () => {
   };
 
   const handleAddSubmit = async (values) => {
+    setIsSaving(true);
     try {
+      // UX Delay 2 seconds
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
       // === Test Mode: สร้าง test lesson โดยไม่ต้องมี course ===
       if (customerType === "test") {
         const formattedDate = values.date.format("YYYY-MM-DD");
@@ -234,6 +240,8 @@ const Schedule = () => {
           coach: values.coachId,
           lessonDate,
           referredBy: values.referredBy || undefined,
+          branch: values.branchId || selectedBranch || undefined,
+          company: values.company || "",
         };
 
         await createTestLesson(payload);
@@ -313,6 +321,8 @@ const Schedule = () => {
         description: err.response?.data?.error || err.message,
         status: "error",
       });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -325,14 +335,18 @@ const Schedule = () => {
       date: dayjs(lesson.lessonDate),
       time: dayjs(lesson.lessonDate).format("HH:00"),
       branchId: lesson.branch?._id || lesson.branch,
-      commissionRate: lesson.commissionRate || sc.commissionRate || undefined,
-      company: lesson.company || sc.company || undefined,
+      commissionRate: lesson.commissionRate || sc?.commissionRate || undefined,
+      company: lesson.company || sc?.company || undefined,
     });
     setIsEditModalOpen(true);
   };
 
   const handleEditSubmit = async (values) => {
+    setIsSaving(true);
     try {
+      // UX Delay 2 seconds
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
       const formattedDate = values.date.format("YYYY-MM-DD");
       const lessonDate = new Date(`${formattedDate}T${values.time}:00`);
 
@@ -347,7 +361,7 @@ const Schedule = () => {
       if (values.company) payload.company = values.company;
 
       await updateLesson(
-        editingLesson.sc._id,
+        editingLesson.sc?._id || "standalone",
         editingLesson.lesson._id,
         payload,
       );
@@ -367,6 +381,8 @@ const Schedule = () => {
         description: err.response?.data?.error || err.message,
         status: "error",
       });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -548,11 +564,12 @@ const Schedule = () => {
               </Heading>
 
               {viewMode === "daily" && (
-                <HStack
-                  spacing="4"
+                <Flex
+                  mt="2"
+                  gap={{ base: "2", md: "4" }}
                   fontSize="xs"
                   color="gray.500"
-                  display={{ base: "none", md: "flex" }}
+                  flexWrap="wrap"
                 >
                   <Flex align="center" gap="1">
                     <Box w="10px" h="10px" borderRadius="full" bg="#ED8936" />
@@ -568,13 +585,13 @@ const Schedule = () => {
                   </Flex>
                   <Flex align="center" gap="1">
                     <XCircle size="14" color="#E53E3E" />
-                    <Text>ไม่มาเรียน (หักชั่วโมง)</Text>
+                    <Text>ไม่มาเรียน</Text>
                   </Flex>
                   <Flex align="center" gap="1">
                     <AlertCircle size="14" color="#A0AEC0" />
-                    <Text>ยกเลิกคลาส</Text>
+                    <Text>ยกเลิก</Text>
                   </Flex>
-                </HStack>
+                </Flex>
               )}
             </Box>
           </Flex>
@@ -708,7 +725,9 @@ const Schedule = () => {
                 px="3"
                 py="1"
               >
-                {dailyData.lessons?.length || 0} รายการ
+                {(dailyData.lessons || []).filter((l) => l.status !== "legacy")
+                  .length || 0}{" "}
+                รายการ
               </Badge>
             )}
           </Flex>
@@ -764,6 +783,7 @@ const Schedule = () => {
           borderWidth="1px"
           borderColor="gray.100"
           overflow="hidden"
+          mb={8}
         >
           {loading ? (
             <Center py="20">
@@ -778,8 +798,28 @@ const Schedule = () => {
             </Center>
           ) : (
             <Box
-              overflow="auto"
-              maxH={{ base: "60vh", lg: "calc(100vh - 260px)" }}
+              overflowX="auto"
+              overflowY="auto"
+              maxH={{ base: "70vh", lg: "calc(100vh - 260px)" }}
+              css={{
+                "&::-webkit-scrollbar": {
+                  height: "8px",
+                  width: "8px",
+                },
+                "@media (max-width: 768px)": {
+                  "&::-webkit-scrollbar": {
+                    display: "none",
+                  },
+                  msOverflowStyle: "none",
+                  scrollbarWidth: "none",
+                },
+                "&::-webkit-scrollbar-track": { bg: "transparent" },
+                "&::-webkit-scrollbar-thumb": {
+                  bg: "gray.300",
+                  borderRadius: "full",
+                },
+                WebkitOverflowScrolling: "touch",
+              }}
             >
               <Table
                 variant="unstyled"
@@ -798,11 +838,15 @@ const Schedule = () => {
                       fontSize="xs"
                       fontWeight="bold"
                       textAlign="center"
-                      minW="70px"
+                      minW={{ base: "75px", md: "80px" }}
+                      w={{ base: "75px", md: "80px" }}
                       bg="gray.100"
                       position="sticky"
                       left={0}
                       zIndex={3}
+                      boxShadow="1px 0 0 0 var(--chakra-colors-gray-200)"
+                      whiteSpace="nowrap"
+                      userSelect="none"
                     >
                       เวลา
                     </Th>
@@ -815,7 +859,8 @@ const Schedule = () => {
                         fontSize="xs"
                         fontWeight="bold"
                         textAlign="center"
-                        minW="130px"
+                        minW={{ base: "90px", md: "130px" }}
+                        w={{ base: "90px", md: "130px" }}
                         bg={idx % 2 === 0 ? "gray.50" : "white"}
                       >
                         <VStack spacing="0">
@@ -864,7 +909,10 @@ const Schedule = () => {
                           position="sticky"
                           left={0}
                           zIndex={1}
-                          minW="70px"
+                          minW={{ base: "75px", md: "80px" }}
+                          w={{ base: "75px", md: "80px" }}
+                          boxShadow="1px 0 0 0 var(--chakra-colors-gray-200)"
+                          whiteSpace="nowrap"
                         >
                           {time}
                         </Td>
@@ -996,7 +1044,7 @@ const Schedule = () => {
           <Box gridColumn={{ lg: "span 2" }}>
             <Box
               bg="white"
-              p="5"
+              p={{ base: "2", md: "5" }}
               borderRadius="2xl"
               boxShadow="sm"
               borderWidth="1px"
@@ -1049,12 +1097,12 @@ const Schedule = () => {
                       return (
                         <Box
                           key={day}
-                          p="2"
+                          p={{ base: "1", md: "2" }}
                           borderRadius="lg"
                           bg={isToday ? "blue.50" : "gray.50"}
                           borderWidth={isToday ? "2px" : "1px"}
                           borderColor={isToday ? "blue.400" : "gray.100"}
-                          minH="65px"
+                          minH={{ base: "50px", md: "65px" }}
                           cursor="pointer"
                           _hover={{ bg: "blue.50", borderColor: "blue.300" }}
                           transition="all 0.15s"
@@ -1077,16 +1125,32 @@ const Schedule = () => {
                           >
                             {day}
                           </Text>
-                          {dayLessons.length > 0 && (
+                          {dayLessons.filter((l) => l.status !== "legacy")
+                            .length > 0 && (
                             <Badge
                               bg={"#021841"}
                               color={"white"}
                               variant="subtle"
-                              fontSize="10px"
+                              fontSize={{ base: "9px", md: "10px" }}
                               borderRadius="full"
                               mt="1"
+                              px={{ base: "1", md: "2" }}
+                              width="fit-content"
+                              maxW="100%"
+                              overflow="hidden"
+                              textOverflow="ellipsis"
                             >
-                              {dayLessons.length} รายการ
+                              {
+                                dayLessons.filter((l) => l.status !== "legacy")
+                                  .length
+                              }
+                              <Text
+                                as="span"
+                                display={{ base: "none", md: "inline" }}
+                                ml={0.5}
+                              >
+                                รายการ
+                              </Text>
                             </Badge>
                           )}
                         </Box>
@@ -1120,7 +1184,9 @@ const Schedule = () => {
                   ml={2}
                   fontSize="xs"
                 >
-                  {scheduleData?.lessons?.length || 0}
+                  {(scheduleData?.lessons || []).filter(
+                    (l) => l.status !== "legacy",
+                  ).length || 0}
                 </Badge>
               </Flex>
 
@@ -1220,6 +1286,9 @@ const Schedule = () => {
         }}
         onOk={() => form.submit()}
         okText="บันทึก"
+        okButtonProps={{
+          style: { backgroundColor: "#021841", borderColor: "#021841" },
+        }}
         cancelText="ยกเลิก"
         width={800}
         destroyOnClose
@@ -1263,22 +1332,46 @@ const Schedule = () => {
                 <Input placeholder="กรอกชื่อลูกค้าที่มาทดลอง..." />
               </Form.Item>
 
-              <Form.Item name="referredBy" label="พนักงานผู้แนะนำ">
-                <AntSelect
-                  showSearch
-                  allowClear
-                  placeholder="เลือกพนักงานที่แนะนำลูกค้ามา..."
-                  options={allEmployees.map((e) => ({
-                    label: `${e.firstNameTh} ${e.lastNameTh} (${e.nickname || e.position || ""})`,
-                    value: e._id,
-                  }))}
-                  filterOption={(input, option) =>
-                    (option?.label ?? "")
-                      .toLowerCase()
-                      .includes(input.toLowerCase())
-                  }
-                />
-              </Form.Item>
+              <Flex gap="4">
+                <Form.Item
+                  name="referredBy"
+                  label="พนักงานผู้แนะนำ"
+                  style={{ flex: 1 }}
+                >
+                  <AntSelect
+                    showSearch
+                    allowClear
+                    placeholder="เลือกพนักงานที่แนะนำลูกค้ามา..."
+                    options={allEmployees.map((e) => ({
+                      label: `${e.firstNameTh} ${e.lastNameTh} (${e.nickname || e.position || ""})`,
+                      value: e._id,
+                    }))}
+                    filterOption={(input, option) =>
+                      (option?.label ?? "")
+                        .toLowerCase()
+                        .includes(input.toLowerCase())
+                    }
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  name="company"
+                  label="บริษัท (บังคับเลือก)"
+                  style={{ flex: 1 }}
+                  rules={[{ required: true, message: "กรุณาเลือกบริษัท" }]}
+                >
+                  <AntSelect
+                    placeholder="-- เลือกบริษัท --"
+                    options={[
+                      { label: "บุญรอดกอล์ฟพัฒนา", value: "บุญรอดกอล์ฟพัฒนา" },
+                      {
+                        label: "บุญรอดกอล์ฟโทเทิล",
+                        value: "บุญรอดกอล์ฟโทเทิล",
+                      },
+                    ]}
+                  />
+                </Form.Item>
+              </Flex>
             </>
           )}
 
@@ -1375,8 +1468,11 @@ const Schedule = () => {
                     allowClear
                     placeholder="ใช้ค่าตั้งต้นจากคอร์ส"
                     options={[
-                      { label: "บุญรอดกอล์ฟพัฒนา", value: "บริษัทพัฒนา" },
-                      { label: "บุญรอดกอล์ฟโทเทิล", value: "บริษัทTotal" },
+                      { label: "บุญรอดกอล์ฟพัฒนา", value: "บุญรอดกอล์ฟพัฒนา" },
+                      {
+                        label: "บุญรอดกอล์ฟโทเทิล",
+                        value: "บุญรอดกอล์ฟโทเทิล",
+                      },
                     ]}
                   />
                 </Form.Item>
@@ -1457,12 +1553,12 @@ const Schedule = () => {
                       const selectedBr = branches.find((b) => b._id === val);
                       const branchCode = selectedBr?.code || "";
                       if (branchCode === "teeoff") {
-                        form.setFieldsValue({ company: "บริษัทพัฒนา" });
+                        form.setFieldsValue({ company: "บุญรอดกอล์ฟพัฒนา" });
                       } else if (
                         branchCode === "srinakarin" ||
                         branchCode === "suwannaphum"
                       ) {
-                        form.setFieldsValue({ company: "บริษัทTotal" });
+                        form.setFieldsValue({ company: "บุญรอดกอล์ฟโทเทิล" });
                       } else if (branchCode === "ratchada") {
                         form.setFieldsValue({ company: undefined });
                       } else {
@@ -1511,8 +1607,14 @@ const Schedule = () => {
                           <AntSelect
                             placeholder="-- เลือกบริษัท --"
                             options={[
-                              { label: "บริษัทพัฒนา", value: "บริษัทพัฒนา" },
-                              { label: "บริษัทTotal", value: "บริษัทTotal" },
+                              {
+                                label: "บุญรอดกอล์ฟพัฒนา",
+                                value: "บุญรอดกอล์ฟพัฒนา",
+                              },
+                              {
+                                label: "บุญรอดกอล์ฟโทเทิล",
+                                value: "บุญรอดกอล์ฟโทเทิล",
+                              },
                             ]}
                           />
                         ) : (
@@ -1588,6 +1690,9 @@ const Schedule = () => {
         }
         onOk={() => editForm.submit()}
         okText="บันทึก"
+        okButtonProps={{
+          style: { backgroundColor: "#021841", borderColor: "#021841" },
+        }}
         cancelText="ยกเลิก"
         destroyOnClose
       >
@@ -1668,7 +1773,7 @@ const Schedule = () => {
           </Flex>
 
           <Flex gap="4">
-            <Form.Item
+            {/* <Form.Item
               name="commissionRate"
               label="Commission Rate (ครั้งนี้)"
               style={{ flex: 1 }}
@@ -1689,7 +1794,7 @@ const Schedule = () => {
                   { label: "70%", value: 70 },
                 ]}
               />
-            </Form.Item>
+            </Form.Item> */}
             <Form.Item
               name="company"
               label="บริษัท (ครั้งนี้)"
@@ -1703,8 +1808,8 @@ const Schedule = () => {
                   "admin"
                 }
                 options={[
-                  { label: "บริษัทพัฒนา", value: "บริษัทพัฒนา" },
-                  { label: "บริษัทTotal", value: "บริษัทTotal" },
+                  { label: "บุญรอดกอล์ฟพัฒนา", value: "บุญรอดกอล์ฟพัฒนา" },
+                  { label: "บุญรอดกอล์ฟโทเทิล", value: "บุญรอดกอล์ฟโทเทิล" },
                 ]}
               />
             </Form.Item>
@@ -1745,6 +1850,7 @@ const Schedule = () => {
           </Flex>
         </Form>
       </Modal>
+      {isSaving && <Spinload />}
     </Box>
   );
 };

@@ -102,19 +102,18 @@ const Login = () => {
       {showSplash && <Spinload />}
       <Center h="100vh" bg="gray.100">
         <Box
-          w="full"
-          maxW="md"
+          w={{ base: "92%", sm: "400px" }}
           bg="white"
-          p={8}
+          p={{ base: 8, md: 8 }}
           boxShadow="xl"
           borderRadius="2xl"
         >
           <VStack spacing={6} align="stretch">
             <Center flexDirection="column">
-              <Heading size="lg" mb={2} color="#021841">
+              <Heading size={{ base: "md", md: "lg" }} mb={2} color="#021841">
                 BOONROD GOLF
               </Heading>
-              <Text color="gray.500" fontSize="sm">
+              <Text color="gray.500" fontSize={{ base: "xs", md: "sm" }}>
                 เข้าสู่ระบบเพื่อจัดการข้อมูล
               </Text>
             </Center>
@@ -122,24 +121,28 @@ const Login = () => {
             <form onSubmit={handleLogin}>
               <VStack spacing={4}>
                 <FormControl isRequired>
-                  <FormLabel>EMAIL</FormLabel>
+                  <FormLabel fontSize="sm">EMAIL</FormLabel>
                   <Input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="admin@example.com"
                     bg="gray.50"
+                    size="lg"
+                    fontSize="md"
                   />
                 </FormControl>
 
                 <FormControl isRequired>
-                  <FormLabel>PASSWORD</FormLabel>
+                  <FormLabel fontSize="sm">PASSWORD</FormLabel>
                   <Input
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="********"
                     bg="gray.50"
+                    size="lg"
+                    fontSize="md"
                   />
                 </FormControl>
 

@@ -18,6 +18,7 @@ import { useState, useEffect } from "react";
 import { getCommissionSummary, getCommissionDetails } from "../services/api";
 import dayjs from "dayjs";
 import "dayjs/locale/th";
+import { BiSolidDollarCircle } from "react-icons/bi";
 
 dayjs.locale("th");
 
@@ -150,6 +151,7 @@ const MonthlyCommission = () => {
       title: "โค้ช",
       dataIndex: "coach",
       key: "coach",
+      width: 150,
       render: (coach) => (
         <Flex align="center" gap="3">
           <Avatar
@@ -173,6 +175,7 @@ const MonthlyCommission = () => {
       title: "ตำแหน่ง",
       dataIndex: ["coach", "position"],
       key: "position",
+      width: 100,
       render: (position, record) => (
         <Badge
           bg={"#021841"}
@@ -190,7 +193,7 @@ const MonthlyCommission = () => {
       title: "สาขา",
       dataIndex: "coach",
       key: "branch",
-      width: 400,
+      width: 250,
       render: (coach) => (
         <Text fontSize="sm" color="gray.600">
           {Array.isArray(coach.branch)
@@ -207,6 +210,7 @@ const MonthlyCommission = () => {
       dataIndex: "lessonsCount",
       key: "lessonsCount",
       align: "right",
+      width: 80,
       render: (val) => (
         <Text fontWeight="semibold" color="gray.700">
           {val}
@@ -218,6 +222,7 @@ const MonthlyCommission = () => {
       dataIndex: "totalCommission",
       key: "totalCommission",
       align: "right",
+      width: 120,
       render: (val) => (
         <Text
           fontWeight="bold"
@@ -244,6 +249,12 @@ const MonthlyCommission = () => {
       dataIndex: ["studentCourse", "studentName"],
       key: "studentName",
       render: (val) => val || "-",
+    },
+    {
+      title: "สาขา",
+      key: "branch",
+      width: 120,
+      render: (_, record) => record.branch?.name || "-",
     },
     {
       title: "Rate (%)",
@@ -380,18 +391,33 @@ const MonthlyCommission = () => {
         boxShadow="sm"
         borderWidth="1px"
         borderColor="gray.100"
-        mb="6"
+        mb="2"
         display="flex"
+        flexDirection={{ base: "column", md: "row" }}
         justifyContent="space-between"
+        gap="4"
       >
-        <Flex>
+        <Flex alignItems="center">
           <Box>
-            <Heading size="lg" color="gray.800" mb="1" fontWeight="bold">
-              💰 ค่าคอมรายเดือน
-            </Heading>
-            <Text color="gray.500" fontSize="sm">
-              สรุปค่าคอมมิชชั่นของโค้ชแต่ละคน คลิกที่โค้ชเพื่อดูรายละเอียด
-            </Text>
+            <Flex alignItems="center">
+              <Box
+                bg={"#03337D"}
+                color="white"
+                p={2.5}
+                borderRadius="xl"
+                shadow="sm"
+              >
+                <BiSolidDollarCircle size={24} />
+              </Box>
+              <Box ml={2}>
+                <Heading size="md" color="gray.800" fontWeight="bold">
+                  ค่าคอมรายเดือน
+                </Heading>
+                <Text color="gray.500" fontSize="sm">
+                  สรุปค่าคอมมิชชั่นของโค้ชแต่ละคน คลิกที่โค้ชเพื่อดูรายละเอียด
+                </Text>
+              </Box>
+            </Flex>
           </Box>
         </Flex>
         <Flex gap="4" flexWrap="wrap" alignItems="flex-end">
@@ -410,7 +436,7 @@ const MonthlyCommission = () => {
               bg="gray.50"
               border="none"
               borderRadius="lg"
-              w="220px"
+              w={{ base: "100%", md: "220px" }}
               size="sm"
               value={period}
               onChange={(e) => setPeriod(e.target.value)}
@@ -422,7 +448,7 @@ const MonthlyCommission = () => {
               ))}
             </Select>
           </Box>
-          <Box>
+          <Box textAlign={{ base: "left", md: "right" }}>
             <Text fontSize="xs" color="gray.400">
               {data.summary.totalCoaches
                 ? `โค้ชทั้งหมด ${data.summary.totalCoaches} คน | สอน ${data.summary.totalLessons} ครั้ง`
@@ -436,9 +462,9 @@ const MonthlyCommission = () => {
       </Box>
 
       {/* Summary Cards */}
-      <SimpleGrid columns={{ base: 1, md: 3 }} spacing="5" mb="8">
+      <SimpleGrid columns={{ base: 1, md: 3 }} spacing="5" mb="4">
         <Box
-          p="6"
+          p={{ base: "4", md: "6" }}
           bg="white"
           borderRadius="2xl"
           boxShadow="sm"
@@ -457,7 +483,7 @@ const MonthlyCommission = () => {
           </Stat>
         </Box>
         <Box
-          p="6"
+          p={{ base: "4", md: "6" }}
           bg="white"
           borderRadius="2xl"
           boxShadow="sm"
@@ -476,7 +502,7 @@ const MonthlyCommission = () => {
           </Stat>
         </Box>
         <Box
-          p="6"
+          p={{ base: "4", md: "6" }}
           bg="white"
           borderRadius="2xl"
           boxShadow="sm"
@@ -537,14 +563,9 @@ const MonthlyCommission = () => {
               data.coaches.length > 0 ? (
                 <Table.Summary fixed>
                   <Table.Summary.Row style={{ backgroundColor: "#f0fdf4" }}>
-                    <Table.Summary.Cell index={0} colSpan={3} align="right">
+                    <Table.Summary.Cell index={0} colSpan={4} align="right">
                       <Text fontWeight="bold" color="gray.700">
                         รวมทั้งหมด
-                      </Text>
-                    </Table.Summary.Cell>
-                    <Table.Summary.Cell index={3} align="right">
-                      <Text fontWeight="bold" color="gray.700">
-                        {data.summary.totalLessons}
                       </Text>
                     </Table.Summary.Cell>
                     <Table.Summary.Cell index={4} align="right">
@@ -558,6 +579,7 @@ const MonthlyCommission = () => {
             }
             bordered
             size="small"
+            scroll={{ x: "max-content" }}
           />
         </ConfigProvider>
       </Box>
@@ -611,14 +633,14 @@ const MonthlyCommission = () => {
                   <Table.Summary.Row style={{ backgroundColor: "#f0fdf4" }}>
                     <Table.Summary.Cell
                       index={0}
-                      colSpan={isAdmin ? 6 : 3}
+                      colSpan={isAdmin ? 6 : 4}
                       align="right"
                     >
                       <Text fontWeight="bold" color="gray.700">
                         รวมค่าคอมมิชชั่น
                       </Text>
                     </Table.Summary.Cell>
-                    <Table.Summary.Cell index={4} align="right">
+                    <Table.Summary.Cell index={isAdmin ? 6 : 4} align="right">
                       <Text fontWeight="bold" color="green.700" fontSize="md">
                         {fmt(totalCom)}
                       </Text>

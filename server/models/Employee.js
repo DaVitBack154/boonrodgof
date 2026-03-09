@@ -21,7 +21,7 @@ const employeeSchema = new mongoose.Schema({
   // ข้อมูลการทำงาน
   branch: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Branch' }],
   companies: [{
-    company: { type: String, enum: ['บริษัทพัฒนา', 'บริษัทTotal'] },
+    company: { type: String, enum: ['บุญรอดกอล์ฟพัฒนา', 'บุญรอดกอล์ฟโทเทิล'] },
     employmentType: { type: String, enum: ['fulltime', 'parttime'], default: 'fulltime' }
   }],
   department: { type: String, required: true },

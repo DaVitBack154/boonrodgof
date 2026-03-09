@@ -36,7 +36,7 @@ import {
 import {
   Plus,
   ChevronLeft,
-  Eye,
+  Edit,
   Trash2,
   Calendar,
   User,
@@ -315,7 +315,7 @@ const CourseDetailView = ({ courseId, onBack }) => {
                   fontSize="xs"
                   fontWeight="bold"
                   color="gray.500"
-                  w="80px"
+                  w="85px"
                 >
                   ครั้งที่
                 </Th>
@@ -347,96 +347,134 @@ const CourseDetailView = ({ courseId, onBack }) => {
               </Tr>
             </Thead>
             <Tbody>
-              {lessons.map((lesson) => (
-                <Tr key={lesson._id} _hover={{ bg: "blue.50" }}>
-                  <Td py="3" fontWeight="bold" color="brand.600" fontSize="sm">
-                    #{lesson.lessonNumber}
-                  </Td>
-                  <Td py="3" fontSize="sm" color="gray.700">
-                    <Flex align="center" gap="2">
-                      <Calendar size="14" color="#718096" />
-                      {new Date(lesson.lessonDate).toLocaleDateString("th-TH", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })}
-                      <Text color="gray.400" fontSize="xs">
-                        {new Date(lesson.lessonDate).toLocaleTimeString(
-                          "th-TH",
-                          { hour: "2-digit", minute: "2-digit" },
-                        )}
-                      </Text>
-                    </Flex>
-                  </Td>
-                  <Td py="3">
-                    <Flex align="center" gap="2">
-                      <Avatar
-                        size="xs"
-                        name={
-                          lesson.coach
-                            ? `${lesson.coach.firstNameTh} ${lesson.coach.lastNameTh}`
-                            : ""
-                        }
-                        bg="brand.100"
-                        color="brand.700"
-                      />
-                      <Box>
-                        <Text
-                          fontSize="sm"
-                          fontWeight="medium"
-                          color="gray.800"
-                        >
-                          {lesson.coach?.firstNameTh} {lesson.coach?.lastNameTh}
-                        </Text>
-                        <Text fontSize="xs" color="gray.400">
-                          {lesson.coach?.nickname &&
-                            `(${lesson.coach.nickname})`}
-                        </Text>
-                      </Box>
-                    </Flex>
-                  </Td>
-                  <Td
-                    py="3"
-                    isNumeric
-                    fontWeight="bold"
-                    color="green.600"
-                    fontSize="sm"
-                  >
-                    ฿{fmt(course.commissionPerLesson)}
-                  </Td>
-                  <Td py="3" textAlign="center">
-                    <Badge
-                      colorScheme={
-                        lesson.status === "completed"
-                          ? "green"
-                          : lesson.status === "no_show"
-                            ? "red"
-                            : "gray"
-                      }
-                      variant="subtle"
-                      borderRadius="full"
-                      px="2"
-                      fontSize="xs"
+              {[...lessons]
+                .sort((a, b) => b.lessonNumber - a.lessonNumber)
+                .map((lesson) => (
+                  <Tr key={lesson._id} _hover={{ bg: "blue.50" }}>
+                    <Td
+                      py="3"
+                      fontWeight="bold"
+                      color="brand.600"
+                      fontSize="sm"
                     >
-                      {lesson.status === "completed"
-                        ? "เรียนแล้ว"
-                        : lesson.status === "no_show"
-                          ? "ไม่มา"
-                          : "ยกเลิก"}
-                    </Badge>
-                  </Td>
-                  <Td py="3">
-                    <IconButton
-                      icon={<Trash2 size="12" />}
-                      size="xs"
-                      variant="ghost"
-                      color="red.400"
-                      onClick={() => handleDeleteLesson(lesson._id)}
-                      aria-label="ลบ"
-                    />
-                  </Td>
-                </Tr>
-              ))}
+                      #{lesson.lessonNumber}
+                    </Td>
+                    <Td py="3" fontSize="sm" color="gray.700">
+                      <Flex align="center" gap="2">
+                        <Calendar size="14" color="#718096" />
+                        {new Date(lesson.lessonDate).toLocaleDateString(
+                          "th-TH",
+                          {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                          },
+                        )}
+                        <Text color="gray.400" fontSize="xs">
+                          {new Date(lesson.lessonDate).toLocaleTimeString(
+                            "th-TH",
+                            { hour: "2-digit", minute: "2-digit" },
+                          )}
+                        </Text>
+                      </Flex>
+                    </Td>
+                    <Td py="3">
+                      {lesson.status === "legacy" ? (
+                        <Flex align="center" gap="2" opacity="0.6">
+                          <Text fontSize="sm" color="gray.500">
+                            -
+                          </Text>
+                        </Flex>
+                      ) : (
+                        <Flex align="center" gap="2">
+                          <Avatar
+                            size="xs"
+                            name={
+                              lesson.coach
+                                ? `${lesson.coach.firstNameTh} ${lesson.coach.lastNameTh}`
+                                : ""
+                            }
+                            bg="brand.100"
+                            color="brand.700"
+                          />
+                          <Box>
+                            <Text
+                              fontSize="sm"
+                              fontWeight="medium"
+                              color="gray.800"
+                            >
+                              {lesson.coach?.firstNameTh}{" "}
+                              {lesson.coach?.lastNameTh}
+                            </Text>
+                            <Text fontSize="xs" color="gray.400">
+                              {lesson.coach?.nickname &&
+                                `(${lesson.coach.nickname})`}
+                            </Text>
+                          </Box>
+                        </Flex>
+                      )}
+                    </Td>
+                    <Td
+                      py="3"
+                      isNumeric
+                      fontWeight="bold"
+                      color={
+                        lesson.status === "legacy" ? "gray.400" : "green.600"
+                      }
+                      fontSize="sm"
+                    >
+                      {lesson.status === "legacy"
+                        ? "-"
+                        : `฿${fmt(course.commissionPerLesson)}`}
+                    </Td>
+                    <Td py="3" textAlign="center">
+                      {lesson.status === "legacy" ? (
+                        <Badge
+                          bg="gray.200"
+                          color="gray.600"
+                          variant="solid"
+                          borderRadius="full"
+                          px="2"
+                          fontSize="xs"
+                        >
+                          ข้อมูลก่อนเข้าระบบ
+                        </Badge>
+                      ) : (
+                        <Badge
+                          colorScheme={
+                            lesson.status === "completed"
+                              ? "green"
+                              : lesson.status === "no_show"
+                                ? "red"
+                                : "gray"
+                          }
+                          variant="subtle"
+                          borderRadius="full"
+                          px="2"
+                          fontSize="xs"
+                        >
+                          {lesson.status === "completed"
+                            ? "เรียนแล้ว"
+                            : lesson.status === "no_show"
+                              ? "ไม่มา"
+                              : "ยกเลิก"}
+                        </Badge>
+                      )}
+                    </Td>
+                    <Td py="3">
+                      {lesson.status !== "legacy" && (
+                        <IconButton
+                          icon={<Trash2 size="12" />}
+                          size="xs"
+                          variant="ghost"
+                          color="red.400"
+                          onClick={() => handleDeleteLesson(lesson._id)}
+                          aria-label="ลบ"
+                        />
+                      )}
+                    </Td>
+                  </Tr>
+                ))}
             </Tbody>
           </Table>
         )}
@@ -558,7 +596,10 @@ const StudentCourses = () => {
     commissionRate: 40,
     branch: "",
     company: "",
+    legacyLessons: "",
   });
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const toast = useToast();
 
   const fetchData = async () => {
@@ -582,7 +623,37 @@ const StudentCourses = () => {
     fetchData();
   }, [filterBranch]);
 
-  const handleAddCourse = async () => {
+  const handleOpenAdd = () => {
+    setIsEditMode(false);
+    setEditingId(null);
+    setNewCourse({
+      studentName: "",
+      packagePrice: "",
+      totalLessons: "",
+      commissionRate: 40,
+      branch: "",
+      company: "",
+      legacyLessons: "",
+    });
+    onOpen();
+  };
+
+  const handleEditClick = (course) => {
+    setIsEditMode(true);
+    setEditingId(course._id);
+    setNewCourse({
+      studentName: course.studentName,
+      packagePrice: course.packagePrice.toString(),
+      totalLessons: course.totalLessons.toString(),
+      commissionRate: course.commissionRate,
+      branch: course.branch?._id || course.branch || "",
+      company: course.company || "",
+      legacyLessons: "0", // legacy lessons shouldn't be edited here ideally, or kept as 0
+    });
+    onOpen();
+  };
+
+  const handleSubmitCourse = async () => {
     if (
       !newCourse.studentName ||
       !newCourse.packagePrice ||
@@ -596,29 +667,35 @@ const StudentCourses = () => {
       return;
     }
     try {
-      await createStudentCourse({
-        ...newCourse,
-        packagePrice: Number(newCourse.packagePrice),
-        totalLessons: Number(newCourse.totalLessons),
-      });
-      toast({
-        title: "เพิ่มคอร์สเรียบร้อย",
-        status: "success",
-        duration: 2000,
-      });
+      if (isEditMode) {
+        await updateStudentCourse(editingId, {
+          ...newCourse,
+          packagePrice: Number(newCourse.packagePrice),
+          totalLessons: Number(newCourse.totalLessons),
+        });
+        toast({
+          title: "แก้ไขคอร์สเรียบร้อย",
+          status: "success",
+          duration: 2000,
+        });
+      } else {
+        await createStudentCourse({
+          ...newCourse,
+          packagePrice: Number(newCourse.packagePrice),
+          totalLessons: Number(newCourse.totalLessons),
+          legacyLessons: Number(newCourse.legacyLessons || 0),
+        });
+        toast({
+          title: "เพิ่มคอร์สเรียบร้อย",
+          status: "success",
+          duration: 2000,
+        });
+      }
       onClose();
-      setNewCourse({
-        studentName: "",
-        packagePrice: "",
-        totalLessons: "",
-        commissionRate: 40,
-        branch: "",
-        company: "",
-      });
       fetchData();
     } catch (err) {
       toast({
-        title: "เพิ่มไม่สำเร็จ",
+        title: isEditMode ? "แก้ไขไม่สำเร็จ" : "เพิ่มไม่สำเร็จ",
         description: err.response?.data?.error || err.message,
         status: "error",
         duration: 3000,
@@ -673,7 +750,7 @@ const StudentCourses = () => {
           borderRadius="lg"
           px="6"
           boxShadow="sm"
-          onClick={onOpen}
+          onClick={handleOpenAdd}
         >
           เพิ่มคอร์สใหม่
         </Button>
@@ -939,12 +1016,15 @@ const StudentCourses = () => {
                     <Td py="3">
                       <HStack spacing="1">
                         <IconButton
-                          icon={<Eye size="14" />}
+                          icon={<Edit size="14" />}
                           size="xs"
                           variant="ghost"
                           color="#FFF"
-                          onClick={() => setSelectedCourseId(c._id)}
-                          aria-label="ดู"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditClick(c);
+                          }}
+                          aria-label="แก้ไข"
                           bg={"#021841"}
                         />
                         <IconButton
@@ -952,7 +1032,10 @@ const StudentCourses = () => {
                           size="xs"
                           variant="ghost"
                           color="#FFF"
-                          onClick={() => handleDelete(c._id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(c._id);
+                          }}
                           aria-label="ลบ"
                           bg={"red"}
                         />
@@ -975,7 +1058,9 @@ const StudentCourses = () => {
       <Modal isOpen={isOpen} onClose={onClose} isCentered size="lg">
         <ModalOverlay />
         <ModalContent borderRadius="2xl">
-          <ModalHeader>เพิ่มคอร์สลูกค้าใหม่</ModalHeader>
+          <ModalHeader>
+            {isEditMode ? "แก้ไขข้อมูลคอร์ส" : "เพิ่มคอร์สลูกค้าใหม่"}
+          </ModalHeader>
           <ModalCloseButton />
           <ModalBody pb="6">
             <SimpleGrid columns={2} spacing="4">
@@ -1012,12 +1097,12 @@ const StudentCourses = () => {
 
                     let autoCompany = "";
                     if (branchCode === "teeoff") {
-                      autoCompany = "บริษัทพัฒนา";
+                      autoCompany = "บุญรอดกอล์ฟพัฒนา";
                     } else if (
                       branchCode === "srinakarin" ||
                       branchCode === "suwannaphum"
                     ) {
-                      autoCompany = "บริษัทTotal";
+                      autoCompany = "บุญรอดกอล์ฟโทเทิล";
                     } else if (branchCode === "ratchada") {
                       autoCompany = ""; // let user choose
                     }
@@ -1068,8 +1153,12 @@ const StudentCourses = () => {
                         }
                       >
                         <option value="">-- เลือกบริษัท --</option>
-                        <option value="บริษัทพัฒนา">บริษัทพัฒนา</option>
-                        <option value="บริษัทTotal">บริษัทTotal</option>
+                        <option value="บุญรอดกอล์ฟพัฒนา">
+                          บุญรอดกอล์ฟพัฒนา
+                        </option>
+                        <option value="บุญรอดกอล์ฟโทเทิล">
+                          บุญรอดกอล์ฟโทเทิล
+                        </option>
                       </Select>
                     </FormControl>
                   );
@@ -1133,6 +1222,31 @@ const StudentCourses = () => {
                   placeholder="25"
                 />
               </FormControl>
+              {!isEditMode && (
+                <FormControl>
+                  <FormLabel
+                    fontSize="sm"
+                    fontWeight="semibold"
+                    color="gray.600"
+                  >
+                    จำนวนครั้งที่เรียนไปแล้ว
+                  </FormLabel>
+                  <Input
+                    bg="gray.50"
+                    border="none"
+                    borderRadius="lg"
+                    type="number"
+                    value={newCourse.legacyLessons}
+                    onChange={(e) =>
+                      setNewCourse((p) => ({
+                        ...p,
+                        legacyLessons: e.target.value,
+                      }))
+                    }
+                    placeholder="ถ้ามีการเรียนไปแล้วให้ระบุตัวเลขลงไป"
+                  />
+                </FormControl>
+              )}
               <FormControl>
                 <FormLabel fontSize="sm" fontWeight="semibold" color="gray.600">
                   Commission Rate
@@ -1214,9 +1328,9 @@ const StudentCourses = () => {
               bg="#021841"
               color="white"
               _hover={{ bg: "#021841" }}
-              onClick={handleAddCourse}
+              onClick={handleSubmitCourse}
             >
-              เพิ่มคอร์ส
+              {isEditMode ? "บันทึกการแก้ไข" : "เพิ่มคอร์ส"}
             </Button>
           </ModalFooter>
         </ModalContent>

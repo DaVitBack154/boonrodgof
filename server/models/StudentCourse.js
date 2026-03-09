@@ -5,7 +5,7 @@ const studentCourseSchema = new mongoose.Schema({
   studentName: { type: String, required: true },
   branch: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Branch' }],
   notes: { type: String, default: '' },
-  company: { type: String, enum: ['บริษัทพัฒนา', 'บริษัทTotal', ''], default: '' },
+  company: { type: String, enum: ['บุญรอดกอล์ฟพัฒนา', 'บุญรอดกอล์ฟโทเทิล', ''], default: '' },
 
   // ข้อมูลคอร์ส
   packagePrice: { type: Number, required: true },       // ราคาเรียน (e.g. 30,000)

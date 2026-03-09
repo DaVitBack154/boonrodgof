@@ -104,13 +104,10 @@ const Sidebar = ({ onClose }) => {
     <Flex
       direction="column"
       w="260px"
-      minW="260px"
-      flexShrink={0}
-      bg="brand.900"
+      minH="100vh"
+      bg="#021841" // Dark Navy
       color="white"
-      h="full"
       boxShadow="xl"
-      // Removed display={{ base: "none", md: "block" }} so it renders in drawer
       zIndex="10"
       overflowY="auto"
     >

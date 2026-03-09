@@ -1,17 +1,6 @@
-import {
-  Flex,
-  Text,
-  IconButton,
-  Avatar,
-  Menu,
-  MenuButton,
-  MenuList,
-  MenuItem,
-  Box,
-  Badge,
-  MenuDivider,
-} from "@chakra-ui/react";
-import { Bell, Menu as MenuIcon } from "lucide-react";
+import { Flex, Text, Box, Badge } from "@chakra-ui/react";
+import { Button, Dropdown, Avatar as AntAvatar } from "antd";
+import { Bell, Menu as MenuIcon, LogOut, User as UserIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 
@@ -60,19 +49,29 @@ const Topbar = ({ onOpenSidebar }) => {
       boxShadow="sm"
     >
       <Flex align="center">
-        <IconButton
-          display={{ base: "flex", md: "none" }}
-          aria-label="Open menu"
+        <Button
+          className="mobile-hamburger"
+          style={{
+            display: "none",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 0,
+            width: 40,
+            height: 40,
+            border: "none",
+            background: "transparent",
+            boxShadow: "none",
+            marginRight: 8,
+          }}
           icon={<MenuIcon size="24" />}
           onClick={onOpenSidebar}
-          variant="ghost"
-          mr="2"
         />
         <Text
           fontSize="xl"
           fontWeight="bold"
           color="gray.800"
-          display={{ base: "block", md: "none" }}
+          className="mobile-logo"
+          style={{ display: "none" }}
         >
           BOONROD GOLF
         </Text>
@@ -101,43 +100,73 @@ const Topbar = ({ onOpenSidebar }) => {
           />
         </Box> */}
 
-        <Menu>
-          <MenuButton>
-            <Flex align="center" cursor="pointer">
-              <Avatar size="md" name={"B"} bg="#03337D" color="white" />
-              <Box
-                ml="3"
-                display={{ base: "none", md: "block" }}
-                textAlign="left"
-              >
-                <Text fontSize="sm" fontWeight="bold" color="gray.700">
-                  {displayName}
-                </Text>
-                <Text fontSize="xs" color="gray.500">
-                  {/* {user?.firstNameTh
-                    ? `${user.firstNameTh} ${user.lastNameTh}`
-                    : user?.email || ""} */}
-                  {user?.email || ""}
-                </Text>
-              </Box>
-            </Flex>
-          </MenuButton>
-          <MenuList>
-            <Box px="3" py="2" display={{ base: "block", md: "none" }}>
-              <Text fontSize="sm" fontWeight="bold">
+        <Dropdown
+          menu={{
+            items: [
+              {
+                key: "user-info",
+                label: (
+                  <Box py="1">
+                    <Text fontSize="sm" fontWeight="bold">
+                      {displayName}
+                    </Text>
+                    <Text fontSize="xs" color="gray.500">
+                      {displayRole}
+                    </Text>
+                  </Box>
+                ),
+                style: { display: window.innerWidth < 768 ? "block" : "none" },
+              },
+              {
+                type: "divider",
+                style: { display: window.innerWidth < 768 ? "block" : "none" },
+              },
+              {
+                key: "logout",
+                label: "ออกจากระบบ",
+                danger: true,
+                icon: <LogOut size={16} />,
+                onClick: handleLogout,
+              },
+            ],
+          }}
+          placement="bottomRight"
+          trigger={["click"]}
+        >
+          <Flex align="center" cursor="pointer">
+            <AntAvatar
+              size={40}
+              style={{
+                backgroundColor: "#03337D",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              B
+            </AntAvatar>
+            <Box ml="3" className="desktop-user-info" textAlign="left">
+              <Text fontSize="sm" fontWeight="bold" color="gray.700">
                 {displayName}
               </Text>
               <Text fontSize="xs" color="gray.500">
-                {displayRole}
+                {user?.email || ""}
               </Text>
             </Box>
-            <MenuDivider display={{ base: "block", md: "none" }} />
-            <MenuItem onClick={handleLogout} color="red.500">
-              ออกจากระบบ
-            </MenuItem>
-          </MenuList>
-        </Menu>
+          </Flex>
+        </Dropdown>
       </Flex>
+
+      <style>{`
+        @media (max-width: 767px) {
+          .mobile-hamburger { display: flex !important; }
+          .mobile-logo { display: block !important; }
+          .desktop-user-info { display: none !important; }
+        }
+        @media (min-width: 768px) {
+          .desktop-user-info { display: block !important; }
+        }
+      `}</style>
     </Flex>
   );
 };
