@@ -43,7 +43,7 @@ import {
   Checkbox,
   Wrap,
   WrapItem,
-} from "@chakra-ui/react";
+} from '@chakra-ui/react';
 import {
   Search,
   Plus,
@@ -53,60 +53,159 @@ import {
   FileDown,
   ChevronLeft,
   ChevronRight,
-} from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
+} from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   getEmployees,
   getBranches,
   createEmployee,
   updateEmployee,
   deleteEmployee,
-} from "../services/api";
+} from '../services/api';
+
+const COMPANY_OPTIONS = ['บุญรอดกอล์ฟพัฒนา', 'บุญรอดกอล์ฟโทเทิล'];
+
+const normalizeCompanies = (companies = [], fallbackBaseSalary = 0) => {
+  const map = new Map((companies || []).map((item) => [item.company, item]));
+  return COMPANY_OPTIONS.map((company, index) => {
+    const current = map.get(company) || {};
+    return {
+      company,
+      employmentType: current.employmentType || 'fulltime',
+      baseSalary: Number(
+        current.baseSalary ?? (index === 0 ? fallbackBaseSalary : 0),
+      ),
+    };
+  });
+};
+
+const getCompanyInfo = (employee, company) =>
+  employee?.companies?.find((item) => item.company === company);
+
+const getEmploymentTypeByCompany = (employee, company) =>
+  getCompanyInfo(employee, company)?.employmentType ||
+  employee?.employmentType ||
+  'fulltime';
+
+const getBaseSalaryByCompany = (employee, company) => {
+  const companyInfo = getCompanyInfo(employee, company);
+  if (companyInfo && companyInfo.baseSalary != null) {
+    return Number(companyInfo.baseSalary) || 0;
+  }
+  if (!employee?.companies?.length && company === 'บุญรอดกอล์ฟพัฒนา') {
+    return Number(employee?.baseSalary) || 0;
+  }
+  return 0;
+};
+
+const getEmploymentTypeByTab = (employee, companyFilter) => {
+  if (companyFilter) return getEmploymentTypeByCompany(employee, companyFilter);
+  const types = Array.from(
+    new Set(
+      (employee?.companies || [])
+        .map((item) => item.employmentType)
+        .filter(Boolean),
+    ),
+  );
+  if (types.length === 1) return types[0];
+  if (types.length > 1) return 'mixed';
+  return employee?.employmentType || 'fulltime';
+};
+
+const getBaseSalaryByTab = (employee, companyFilter) => {
+  if (companyFilter) return getBaseSalaryByCompany(employee, companyFilter);
+  if (employee?.companies?.length) {
+    return employee.companies.reduce(
+      (sum, item) => sum + (Number(item.baseSalary) || 0),
+      0,
+    );
+  }
+  return Number(employee?.baseSalary) || 0;
+};
 
 // ===== Employee Detail/Edit Form (Tab View) =====
 const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
-  const [form, setForm] = useState(
-    employee || {
-      prefix: "นาย",
-      firstNameTh: "",
-      lastNameTh: "",
-      firstNameEn: "",
-      lastNameEn: "",
-      nickname: "",
-      idCard: "",
-      birthDate: "",
-      gender: "male",
-      maritalStatus: "single",
-      phone: "",
-      email: "",
-      address: "",
-      branch: [],
-      department: "",
-      position: "",
-      level: "junior",
-      employmentType: "fulltime",
-      salaryType: "monthly",
-      startDate: "",
-      status: "active",
-      shift: "normal",
-      baseSalary: 0,
-      livingAllowance: 0,
-      positionAllowance: 0,
-      professionalAllowance: 0,
-      otRate: 0,
-      socialSecurityEnabled: true,
-      taxMethod: "progressive",
-      pvdPercent: 0,
-      bankName: "",
-      bankAccount: "",
-      bankAccountName: "",
-    },
+  const [form, setForm] = useState(() =>
+    employee
+      ? {
+          ...employee,
+          companies: normalizeCompanies(
+            employee.companies,
+            employee.baseSalary,
+          ),
+          payrollCompany: employee.payrollCompany || 'บุญรอดกอล์ฟพัฒนา',
+        }
+      : {
+          prefix: 'นาย',
+          firstNameTh: '',
+          lastNameTh: '',
+          firstNameEn: '',
+          lastNameEn: '',
+          nickname: '',
+          idCard: '',
+          birthDate: '',
+          gender: 'male',
+          maritalStatus: 'single',
+          phone: '',
+          email: '',
+          address: '',
+          branch: [],
+          department: '',
+          position: '',
+          level: 'junior',
+          employmentType: 'fulltime',
+          salaryType: 'monthly',
+          startDate: '',
+          status: 'active',
+          shift: 'normal',
+          baseSalary: 0,
+          livingAllowance: 0,
+          positionAllowance: 0,
+          professionalAllowance: 0,
+          otRate: 0,
+          socialSecurityEnabled: true,
+          taxMethod: 'progressive',
+          payrollCompany: 'บุญรอดกอล์ฟพัฒนา',
+          pvdPercent: 0,
+          bankName: '',
+          bankAccount: '',
+          bankAccountName: '',
+          companies: normalizeCompanies([], 0),
+        },
   );
   const [saving, setSaving] = useState(false);
   const toast = useToast();
 
   const handleChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleCompanyBaseSalaryChange = (company, value) => {
+    setForm((prev) => ({
+      ...prev,
+      companies: normalizeCompanies(prev.companies, prev.baseSalary).map(
+        (item) =>
+          item.company === company
+            ? { ...item, baseSalary: Number(value) || 0 }
+            : item,
+      ),
+    }));
+  };
+
+  const handleCompanyEmploymentTypeChange = (company, value) => {
+    setForm((prev) => ({
+      ...prev,
+      companies: normalizeCompanies(prev.companies, prev.baseSalary).map(
+        (item) => {
+          if (item.company !== company) return item;
+          return {
+            ...item,
+            employmentType: value,
+            baseSalary: value === 'parttime' ? 0 : Number(item.baseSalary) || 0,
+          };
+        },
+      ),
+    }));
   };
 
   const handleSubmit = async () => {
@@ -120,8 +219,8 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
       !form.startDate
     ) {
       toast({
-        title: "กรุณากรอกข้อมูลที่จำเป็น",
-        status: "warning",
+        title: 'กรุณากรอกข้อมูลที่จำเป็น',
+        status: 'warning',
         duration: 3000,
       });
       return;
@@ -129,23 +228,41 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
     setSaving(true);
     try {
       const data = { ...form };
+      data.companies = normalizeCompanies(data.companies, data.baseSalary).map(
+        (item) => ({
+          company: item.company,
+          employmentType: item.employmentType,
+          baseSalary:
+            item.employmentType === 'parttime'
+              ? 0
+              : Number(item.baseSalary) || 0,
+        }),
+      );
+      data.baseSalary = data.companies.reduce(
+        (sum, item) => sum + (Number(item.baseSalary) || 0),
+        0,
+      );
+      const payrollCompanyInfo = data.companies.find(
+        (item) => item.company === data.payrollCompany,
+      );
+      data.employmentType = payrollCompanyInfo?.employmentType || 'fulltime';
       // Handle branch - send Array of ObjectIds
       if (Array.isArray(data.branch)) {
         data.branch = data.branch.map((b) =>
-          typeof b === "object" && b._id ? b._id : b,
+          typeof b === 'object' && b._id ? b._id : b,
         );
       }
       await onSave(data);
       toast({
-        title: isNew ? "เพิ่มพนักงานเรียบร้อย" : "บันทึกเรียบร้อย",
-        status: "success",
+        title: isNew ? 'เพิ่มพนักงานเรียบร้อย' : 'บันทึกเรียบร้อย',
+        status: 'success',
         duration: 2000,
       });
     } catch (err) {
       toast({
-        title: "เกิดข้อผิดพลาด",
+        title: 'เกิดข้อผิดพลาด',
         description: err.response?.data?.error || err.message,
-        status: "error",
+        status: 'error',
         duration: 3000,
       });
     }
@@ -154,13 +271,27 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
 
   // Extract branch IDs from form.branch (which is now an array)
   const branchIds = Array.isArray(form.branch)
-    ? form.branch.map((b) => (typeof b === "object" && b._id ? b._id : b))
+    ? form.branch.map((b) => (typeof b === 'object' && b._id ? b._id : b))
     : [];
+  const payrollEmploymentType = getEmploymentTypeByCompany(
+    form,
+    form.payrollCompany || 'บุญรอดกอล์ฟพัฒนา',
+  );
+  const normalizedCompanies = normalizeCompanies(
+    form.companies,
+    form.baseSalary,
+  );
+  const pattanEmploymentType =
+    normalizedCompanies[0]?.employmentType || 'fulltime';
+  const totalEmploymentType =
+    normalizedCompanies[1]?.employmentType || 'fulltime';
+  const pattanBaseSalary = normalizedCompanies[0]?.baseSalary || 0;
+  const totalBaseSalary = normalizedCompanies[1]?.baseSalary || 0;
 
   const handleBranchToggle = (branchId) => {
     setForm((prev) => {
       const currentIds = Array.isArray(prev.branch)
-        ? prev.branch.map((b) => (typeof b === "object" && b._id ? b._id : b))
+        ? prev.branch.map((b) => (typeof b === 'object' && b._id ? b._id : b))
         : [];
       const newBranch = currentIds.includes(branchId)
         ? currentIds.filter((id) => id !== branchId)
@@ -176,8 +307,8 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
         mb="4"
         onClick={onBack}
         leftIcon={<ChevronLeft size="16" />}
-        bg={"#021841"}
-        _hover={{ bg: "#021841" }}
+        bg={'#021841'}
+        _hover={{ bg: '#021841' }}
         color="#FFF"
       >
         กลับไปรายชื่อ
@@ -196,7 +327,7 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
           <Box color="white">
             <Heading size="md">
               {isNew
-                ? "เพิ่มพนักงานใหม่"
+                ? 'เพิ่มพนักงานใหม่'
                 : `${form.firstNameTh} ${form.lastNameTh}`}
             </Heading>
             {!isNew && (
@@ -207,31 +338,31 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
             <HStack mt="2" spacing="2">
               <Badge
                 colorScheme={
-                  form.employmentType === "parttime" ? "purple" : "blue"
+                  payrollEmploymentType === 'parttime' ? 'purple' : 'blue'
                 }
                 variant="solid"
                 borderRadius="full"
                 px="3"
               >
-                {form.employmentType === "parttime" ? "Part-time" : "ประจำ"}
+                {payrollEmploymentType === 'parttime' ? 'Part-time' : 'ประจำ'}
               </Badge>
               <Badge
                 colorScheme={
-                  form.status === "active"
-                    ? "green"
-                    : form.status === "probation"
-                      ? "yellow"
-                      : "red"
+                  form.status === 'active'
+                    ? 'green'
+                    : form.status === 'probation'
+                      ? 'yellow'
+                      : 'red'
                 }
                 variant="solid"
                 borderRadius="full"
                 px="3"
               >
-                {form.status === "active"
-                  ? "Active"
-                  : form.status === "probation"
-                    ? "ทดลองงาน"
-                    : "ลาออก"}
+                {form.status === 'active'
+                  ? 'Active'
+                  : form.status === 'probation'
+                    ? 'ทดลองงาน'
+                    : 'ลาออก'}
               </Badge>
             </HStack>
           </Box>
@@ -271,7 +402,7 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                     border="none"
                     borderRadius="lg"
                     value={form.prefix}
-                    onChange={(e) => handleChange("prefix", e.target.value)}
+                    onChange={(e) => handleChange('prefix', e.target.value)}
                   >
                     <option value="นาย">นาย</option>
                     <option value="นาง">นาง</option>
@@ -292,7 +423,7 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                     borderRadius="lg"
                     value={form.firstNameTh}
                     onChange={(e) =>
-                      handleChange("firstNameTh", e.target.value)
+                      handleChange('firstNameTh', e.target.value)
                     }
                   />
                 </FormControl>
@@ -309,7 +440,7 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                     border="none"
                     borderRadius="lg"
                     value={form.lastNameTh}
-                    onChange={(e) => handleChange("lastNameTh", e.target.value)}
+                    onChange={(e) => handleChange('lastNameTh', e.target.value)}
                   />
                 </FormControl>
                 <FormControl>
@@ -326,7 +457,7 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                     borderRadius="lg"
                     value={form.firstNameEn}
                     onChange={(e) =>
-                      handleChange("firstNameEn", e.target.value)
+                      handleChange('firstNameEn', e.target.value)
                     }
                   />
                 </FormControl>
@@ -343,7 +474,7 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                     border="none"
                     borderRadius="lg"
                     value={form.lastNameEn}
-                    onChange={(e) => handleChange("lastNameEn", e.target.value)}
+                    onChange={(e) => handleChange('lastNameEn', e.target.value)}
                   />
                 </FormControl>
                 <FormControl>
@@ -359,7 +490,7 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                     border="none"
                     borderRadius="lg"
                     value={form.nickname}
-                    onChange={(e) => handleChange("nickname", e.target.value)}
+                    onChange={(e) => handleChange('nickname', e.target.value)}
                   />
                 </FormControl>
                 <FormControl>
@@ -375,7 +506,7 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                     border="none"
                     borderRadius="lg"
                     value={form.idCard}
-                    onChange={(e) => handleChange("idCard", e.target.value)}
+                    onChange={(e) => handleChange('idCard', e.target.value)}
                   />
                 </FormControl>
                 <FormControl>
@@ -392,9 +523,9 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                     type="date"
                     borderRadius="lg"
                     value={
-                      form.birthDate ? form.birthDate.substring(0, 10) : ""
+                      form.birthDate ? form.birthDate.substring(0, 10) : ''
                     }
-                    onChange={(e) => handleChange("birthDate", e.target.value)}
+                    onChange={(e) => handleChange('birthDate', e.target.value)}
                   />
                 </FormControl>
                 <FormControl>
@@ -410,7 +541,7 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                     border="none"
                     borderRadius="lg"
                     value={form.gender}
-                    onChange={(e) => handleChange("gender", e.target.value)}
+                    onChange={(e) => handleChange('gender', e.target.value)}
                   >
                     <option value="male">ชาย</option>
                     <option value="female">หญิง</option>
@@ -430,7 +561,7 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                     borderRadius="lg"
                     value={form.maritalStatus}
                     onChange={(e) =>
-                      handleChange("maritalStatus", e.target.value)
+                      handleChange('maritalStatus', e.target.value)
                     }
                   >
                     <option value="single">โสด</option>
@@ -450,7 +581,7 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                     border="none"
                     borderRadius="lg"
                     value={form.phone}
-                    onChange={(e) => handleChange("phone", e.target.value)}
+                    onChange={(e) => handleChange('phone', e.target.value)}
                   />
                 </FormControl>
                 <FormControl>
@@ -466,7 +597,7 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                     border="none"
                     borderRadius="lg"
                     value={form.email}
-                    onChange={(e) => handleChange("email", e.target.value)}
+                    onChange={(e) => handleChange('email', e.target.value)}
                   />
                 </FormControl>
               </SimpleGrid>
@@ -480,7 +611,7 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                   borderRadius="lg"
                   rows="2"
                   value={form.address}
-                  onChange={(e) => handleChange("address", e.target.value)}
+                  onChange={(e) => handleChange('address', e.target.value)}
                 />
               </FormControl>
             </TabPanel>
@@ -502,7 +633,7 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                       border="none"
                       isReadOnly
                       borderRadius="lg"
-                      value={form.employeeId || ""}
+                      value={form.employeeId || ''}
                     />
                   </FormControl>
                 )}
@@ -520,9 +651,9 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                     type="date"
                     borderRadius="lg"
                     value={
-                      form.startDate ? form.startDate.substring(0, 10) : ""
+                      form.startDate ? form.startDate.substring(0, 10) : ''
                     }
-                    onChange={(e) => handleChange("startDate", e.target.value)}
+                    onChange={(e) => handleChange('startDate', e.target.value)}
                   />
                 </FormControl>
                 <FormControl>
@@ -538,7 +669,7 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                     border="none"
                     borderRadius="lg"
                     value={form.status}
-                    onChange={(e) => handleChange("status", e.target.value)}
+                    onChange={(e) => handleChange('status', e.target.value)}
                   >
                     <option value="active">ทำงานอยู่ (Active)</option>
                     <option value="probation">ทดลองงาน (Probation)</option>
@@ -558,7 +689,7 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                     border="none"
                     borderRadius="lg"
                     value={form.department}
-                    onChange={(e) => handleChange("department", e.target.value)}
+                    onChange={(e) => handleChange('department', e.target.value)}
                     placeholder="เช่น ผู้ฝึกสอน, ธุรการ"
                   />
                 </FormControl>
@@ -575,7 +706,7 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                     border="none"
                     borderRadius="lg"
                     value={form.position}
-                    onChange={(e) => handleChange("position", e.target.value)}
+                    onChange={(e) => handleChange('position', e.target.value)}
                   />
                 </FormControl>
                 <FormControl>
@@ -591,7 +722,7 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                     border="none"
                     borderRadius="lg"
                     value={form.level}
-                    onChange={(e) => handleChange("level", e.target.value)}
+                    onChange={(e) => handleChange('level', e.target.value)}
                   >
                     <option value="junior">พนักงาน (Junior)</option>
                     <option value="senior">อาวุโส (Senior)</option>
@@ -617,7 +748,7 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                             size="sm"
                           >
                             <Text fontSize="sm">
-                              {b.type === "headquarters" ? "🏢 " : "📍 "}
+                              {b.type === 'headquarters' ? '🏢 ' : '📍 '}
                               {b.name}
                             </Text>
                           </Checkbox>
@@ -632,15 +763,18 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                     color="gray.600"
                     fontWeight="semibold"
                   >
-                    ประเภทพนักงาน
+                    ประเภทพนักงาน (บุญรอดกอล์ฟพัฒนา)
                   </FormLabel>
                   <Select
                     bg="gray.50"
                     border="none"
                     borderRadius="lg"
-                    value={form.employmentType}
+                    value={pattanEmploymentType}
                     onChange={(e) =>
-                      handleChange("employmentType", e.target.value)
+                      handleCompanyEmploymentTypeChange(
+                        'บุญรอดกอล์ฟพัฒนา',
+                        e.target.value,
+                      )
                     }
                   >
                     <option value="fulltime">ประจำ (Full-time)</option>
@@ -653,17 +787,22 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                     color="gray.600"
                     fontWeight="semibold"
                   >
-                    ลักษณะเงินเดือน
+                    ประเภทพนักงาน (บุญรอดกอล์ฟโทเทิล)
                   </FormLabel>
                   <Select
                     bg="gray.50"
                     border="none"
                     borderRadius="lg"
-                    value={form.salaryType}
-                    onChange={(e) => handleChange("salaryType", e.target.value)}
+                    value={totalEmploymentType}
+                    onChange={(e) =>
+                      handleCompanyEmploymentTypeChange(
+                        'บุญรอดกอล์ฟโทเทิล',
+                        e.target.value,
+                      )
+                    }
                   >
-                    <option value="monthly">รายเดือน</option>
-                    <option value="daily">รายวัน</option>
+                    <option value="fulltime">ประจำ (Full-time)</option>
+                    <option value="parttime">พาร์ทไทม์ (Part-time)</option>
                   </Select>
                 </FormControl>
               </SimpleGrid>
@@ -678,16 +817,59 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                     color="gray.600"
                     fontWeight="semibold"
                   >
-                    เงินเดือนฐาน (Base Salary)
+                    เงินเดือนฐาน (บุญรอดกอล์ฟพัฒนา)
                   </FormLabel>
                   <Input
                     bg="gray.50"
                     border="none"
                     borderRadius="lg"
                     type="number"
-                    value={form.baseSalary}
+                    value={
+                      pattanEmploymentType === 'parttime'
+                        ? ''
+                        : pattanBaseSalary
+                    }
+                    isDisabled={pattanEmploymentType === 'parttime'}
+                    placeholder={
+                      pattanEmploymentType === 'parttime'
+                        ? 'Part-time ไม่ต้องกรอกเงินเดือน'
+                        : ''
+                    }
                     onChange={(e) =>
-                      handleChange("baseSalary", Number(e.target.value))
+                      handleCompanyBaseSalaryChange(
+                        'บุญรอดกอล์ฟพัฒนา',
+                        e.target.value,
+                      )
+                    }
+                  />
+                </FormControl>
+                <FormControl>
+                  <FormLabel
+                    fontSize="sm"
+                    color="gray.600"
+                    fontWeight="semibold"
+                  >
+                    เงินเดือนฐาน (บุญรอดกอล์ฟโทเทิล)
+                  </FormLabel>
+                  <Input
+                    bg="gray.50"
+                    border="none"
+                    borderRadius="lg"
+                    type="number"
+                    value={
+                      totalEmploymentType === 'parttime' ? '' : totalBaseSalary
+                    }
+                    isDisabled={totalEmploymentType === 'parttime'}
+                    placeholder={
+                      totalEmploymentType === 'parttime'
+                        ? 'Part-time ไม่ต้องกรอกเงินเดือน'
+                        : ''
+                    }
+                    onChange={(e) =>
+                      handleCompanyBaseSalaryChange(
+                        'บุญรอดกอล์ฟโทเทิล',
+                        e.target.value,
+                      )
                     }
                   />
                 </FormControl>
@@ -706,7 +888,7 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                     type="number"
                     value={form.livingAllowance}
                     onChange={(e) =>
-                      handleChange("livingAllowance", Number(e.target.value))
+                      handleChange('livingAllowance', Number(e.target.value))
                     }
                   />
                 </FormControl>
@@ -725,7 +907,7 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                     type="number"
                     value={form.positionAllowance}
                     onChange={(e) =>
-                      handleChange("positionAllowance", Number(e.target.value))
+                      handleChange('positionAllowance', Number(e.target.value))
                     }
                   />
                 </FormControl>
@@ -745,7 +927,7 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                     value={form.professionalAllowance}
                     onChange={(e) =>
                       handleChange(
-                        "professionalAllowance",
+                        'professionalAllowance',
                         Number(e.target.value),
                       )
                     }
@@ -763,11 +945,11 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                     bg="gray.50"
                     border="none"
                     borderRadius="lg"
-                    value={form.socialSecurityEnabled ? "yes" : "no"}
+                    value={form.socialSecurityEnabled ? 'yes' : 'no'}
                     onChange={(e) =>
                       handleChange(
-                        "socialSecurityEnabled",
-                        e.target.value === "yes",
+                        'socialSecurityEnabled',
+                        e.target.value === 'yes',
                       )
                     }
                   >
@@ -788,14 +970,16 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                     border="none"
                     borderRadius="lg"
                     value={form.taxMethod}
-                    onChange={(e) => handleChange("taxMethod", e.target.value)}
+                    onChange={(e) => handleChange('taxMethod', e.target.value)}
                   >
                     <option value="progressive">คำนวณตามขั้นบันได</option>
                     <option value="flat">อัตราคงที่</option>
                   </Select>
                 </FormControl>
               </SimpleGrid>
-              {form.employmentType === "parttime" && (
+              {normalizeCompanies(form.companies, form.baseSalary).some(
+                (item) => item.employmentType === 'parttime',
+              ) && (
                 <Box
                   mt="4"
                   p="4"
@@ -828,7 +1012,7 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                     border="none"
                     borderRadius="lg"
                     value={form.bankName}
-                    onChange={(e) => handleChange("bankName", e.target.value)}
+                    onChange={(e) => handleChange('bankName', e.target.value)}
                   >
                     <option value="">-- เลือกธนาคาร --</option>
                     <option value="ธนาคารกสิกรไทย">ธนาคารกสิกรไทย</option>
@@ -851,7 +1035,7 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                     borderRadius="lg"
                     value={form.bankAccount}
                     onChange={(e) =>
-                      handleChange("bankAccount", e.target.value)
+                      handleChange('bankAccount', e.target.value)
                     }
                   />
                 </FormControl>
@@ -869,7 +1053,7 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                     borderRadius="lg"
                     value={form.bankAccountName}
                     onChange={(e) =>
-                      handleChange("bankAccountName", e.target.value)
+                      handleChange('bankAccountName', e.target.value)
                     }
                   />
                 </FormControl>
@@ -885,13 +1069,13 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
           <Button
             bg="#021841"
             color="white"
-            _hover={{ bg: "#021841" }}
+            _hover={{ bg: '#021841' }}
             borderRadius="lg"
             px="8"
             onClick={handleSubmit}
             isLoading={saving}
           >
-            {isNew ? "เพิ่มพนักงาน" : "บันทึก"}
+            {isNew ? 'เพิ่มพนักงาน' : 'บันทึก'}
           </Button>
         </Flex>
       </Box>
@@ -907,10 +1091,10 @@ const Employees = () => {
   const [employees, setEmployees] = useState([]);
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filterBranch, setFilterBranch] = useState("");
-  const [filterType, setFilterType] = useState("");
-  const [companyFilter, setCompanyFilter] = useState("บุญรอดกอล์ฟพัฒนา");
-  const [searchText, setSearchText] = useState("");
+  const [filterBranch, setFilterBranch] = useState('');
+  const [filterType, setFilterType] = useState('');
+  const [companyFilter, setCompanyFilter] = useState('บุญรอดกอล์ฟพัฒนา');
+  const [searchText, setSearchText] = useState('');
   const toast = useToast();
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -920,8 +1104,6 @@ const Employees = () => {
     try {
       const params = {};
       if (filterBranch) params.branch = filterBranch;
-      if (filterType) params.employmentType = filterType;
-
       const [emps, brs] = await Promise.all([
         getEmployees(params),
         getBranches(),
@@ -930,9 +1112,9 @@ const Employees = () => {
       setBranches(brs);
     } catch (err) {
       toast({
-        title: "โหลดข้อมูลล้มเหลว",
+        title: 'โหลดข้อมูลล้มเหลว',
         description: err.message,
-        status: "error",
+        status: 'error',
         duration: 3000,
       });
     }
@@ -974,14 +1156,14 @@ const Employees = () => {
     if (!deleteTarget) return;
     try {
       await deleteEmployee(deleteTarget._id);
-      toast({ title: "ลบพนักงานเรียบร้อย", status: "success", duration: 2000 });
+      toast({ title: 'ลบพนักงานเรียบร้อย', status: 'success', duration: 2000 });
       onClose();
       fetchData();
     } catch (err) {
       toast({
-        title: "ลบไม่สำเร็จ",
+        title: 'ลบไม่สำเร็จ',
         description: err.response?.data?.error || err.message,
-        status: "error",
+        status: 'error',
         duration: 3000,
       });
     }
@@ -1005,13 +1187,23 @@ const Employees = () => {
   // Filter employees by company tab
   const companyFiltered = useMemo(() => {
     if (!companyFilter) return employees;
-    return employees.filter((e) =>
-      e.companies?.some((c) => c.company === companyFilter),
-    );
+    return employees.filter((e) => {
+      if (e.companies?.length) {
+        return e.companies.some((c) => c.company === companyFilter);
+      }
+      return companyFilter === 'บุญรอดกอล์ฟพัฒนา';
+    });
   }, [employees, companyFilter]);
 
+  const typeFiltered = useMemo(() => {
+    if (!filterType) return companyFiltered;
+    return companyFiltered.filter(
+      (e) => getEmploymentTypeByTab(e, companyFilter) === filterType,
+    );
+  }, [companyFiltered, filterType, companyFilter]);
+
   // Filter employees by search text
-  const filtered = companyFiltered.filter((e) => {
+  const filtered = typeFiltered.filter((e) => {
     if (!searchText) return true;
     const s = searchText.toLowerCase();
     return (
@@ -1044,7 +1236,7 @@ const Employees = () => {
           leftIcon={<Plus size="18" />}
           bg="#021841"
           color="white"
-          _hover={{ bg: "brand.700" }}
+          _hover={{ bg: 'brand.700' }}
           borderRadius="lg"
           px="6"
           boxShadow="sm"
@@ -1057,14 +1249,14 @@ const Employees = () => {
       {/* Company Tabs */}
       <Tabs
         index={
-          companyFilter === "บุญรอดกอล์ฟพัฒนา"
+          companyFilter === 'บุญรอดกอล์ฟพัฒนา'
             ? 0
-            : companyFilter === "บุญรอดกอล์ฟโทเทิล"
+            : companyFilter === 'บุญรอดกอล์ฟโทเทิล'
               ? 1
               : 2
         }
         onChange={(index) => {
-          const companies = ["บุญรอดกอล์ฟพัฒนา", "บุญรอดกอล์ฟโทเทิล", ""];
+          const companies = ['บุญรอดกอล์ฟพัฒนา', 'บุญรอดกอล์ฟโทเทิล', ''];
           setCompanyFilter(companies[index]);
         }}
         variant="enclosed"
@@ -1075,12 +1267,12 @@ const Employees = () => {
             bg="gray.50"
             color="gray.500"
             _selected={{
-              color: "brand.700",
-              bg: "white",
-              borderTop: "3px solid",
-              borderTopColor: "brand.600",
-              borderBottomColor: "white",
-              fontWeight: "bold",
+              color: 'brand.700',
+              bg: 'white',
+              borderTop: '3px solid',
+              borderTopColor: 'brand.600',
+              borderBottomColor: 'white',
+              fontWeight: 'bold',
             }}
             fontWeight="semibold"
             px="8"
@@ -1093,12 +1285,12 @@ const Employees = () => {
             bg="gray.50"
             color="gray.500"
             _selected={{
-              color: "brand.700",
-              bg: "white",
-              borderTop: "3px solid",
-              borderTopColor: "brand.600",
-              borderBottomColor: "white",
-              fontWeight: "bold",
+              color: 'brand.700',
+              bg: 'white',
+              borderTop: '3px solid',
+              borderTopColor: 'brand.600',
+              borderBottomColor: 'white',
+              fontWeight: 'bold',
             }}
             fontWeight="semibold"
             px="8"
@@ -1112,12 +1304,12 @@ const Employees = () => {
             bg="gray.50"
             color="gray.500"
             _selected={{
-              color: "brand.700",
-              bg: "white",
-              borderTop: "3px solid",
-              borderTopColor: "brand.600",
-              borderBottomColor: "white",
-              fontWeight: "bold",
+              color: 'brand.700',
+              bg: 'white',
+              borderTop: '3px solid',
+              borderTopColor: 'brand.600',
+              borderBottomColor: 'white',
+              fontWeight: 'bold',
             }}
             fontWeight="semibold"
             px="8"
@@ -1223,8 +1415,10 @@ const Employees = () => {
             >
               <Text fontSize="2xl" fontWeight="bold" color="blue.500">
                 {
-                  companyFiltered.filter((e) => e.employmentType === "fulltime")
-                    .length
+                  companyFiltered.filter(
+                    (e) =>
+                      getEmploymentTypeByTab(e, companyFilter) === 'fulltime',
+                  ).length
                 }
               </Text>
               <Text fontSize="xs" color="gray.500">
@@ -1241,8 +1435,10 @@ const Employees = () => {
             >
               <Text fontSize="2xl" fontWeight="bold" color="purple.500">
                 {
-                  companyFiltered.filter((e) => e.employmentType === "parttime")
-                    .length
+                  companyFiltered.filter(
+                    (e) =>
+                      getEmploymentTypeByTab(e, companyFilter) === 'parttime',
+                  ).length
                 }
               </Text>
               <Text fontSize="xs" color="gray.500">
@@ -1258,7 +1454,7 @@ const Employees = () => {
               borderColor="green.100"
             >
               <Text fontSize="2xl" fontWeight="bold" color="green.500">
-                {companyFiltered.filter((e) => e.status === "active").length}
+                {companyFiltered.filter((e) => e.status === 'active').length}
               </Text>
               <Text fontSize="xs" color="gray.500">
                 Active
@@ -1318,7 +1514,7 @@ const Employees = () => {
                     {filtered.map((emp) => (
                       <Tr
                         key={emp._id}
-                        _hover={{ bg: "blue.50", cursor: "pointer" }}
+                        _hover={{ bg: 'blue.50', cursor: 'pointer' }}
                         transition="background 0.15s"
                       >
                         <Td py="4" onClick={() => handleView(emp)}>
@@ -1362,25 +1558,35 @@ const Employees = () => {
                             ? emp.branch
                                 .map((b) => b?.name)
                                 .filter(Boolean)
-                                .join(", ")
-                            : emp.branch?.name || "-"}
+                                .join(', ')
+                            : emp.branch?.name || '-'}
                         </Td>
                         <Td py="4" onClick={() => handleView(emp)}>
-                          <Badge
-                            colorScheme={
-                              emp.employmentType === "parttime"
-                                ? "#2f5855"
-                                : "#2f5855"
-                            }
-                            variant="subtle"
-                            borderRadius="full"
-                            px="2"
-                            fontSize="xs"
-                          >
-                            {emp.employmentType === "parttime"
-                              ? "Part-time"
-                              : "ประจำ"}
-                          </Badge>
+                          {(() => {
+                            const employmentType = getEmploymentTypeByTab(
+                              emp,
+                              companyFilter,
+                            );
+                            return (
+                              <Badge
+                                colorScheme={
+                                  employmentType === 'parttime'
+                                    ? '#2f5855'
+                                    : '#2f5855'
+                                }
+                                variant="subtle"
+                                borderRadius="full"
+                                px="2"
+                                fontSize="xs"
+                              >
+                                {employmentType === 'mixed'
+                                  ? 'ผสม'
+                                  : employmentType === 'parttime'
+                                    ? 'Part-time'
+                                    : 'ประจำ'}
+                              </Badge>
+                            );
+                          })()}
                         </Td>
                         <Td
                           py="4"
@@ -1390,7 +1596,10 @@ const Employees = () => {
                           color="gray.700"
                           onClick={() => handleView(emp)}
                         >
-                          {emp.baseSalary?.toLocaleString("th-TH")}
+                          {getBaseSalaryByTab(
+                            emp,
+                            companyFilter,
+                          ).toLocaleString('th-TH')}
                         </Td>
                         <Td
                           py="4"
@@ -1399,22 +1608,22 @@ const Employees = () => {
                         >
                           <Badge
                             colorScheme={
-                              emp.status === "active"
-                                ? "#2f5855"
-                                : emp.status === "probation"
-                                  ? "yellow"
-                                  : "red"
+                              emp.status === 'active'
+                                ? '#2f5855'
+                                : emp.status === 'probation'
+                                  ? 'yellow'
+                                  : 'red'
                             }
                             variant="subtle"
                             borderRadius="full"
                             px="2"
                             fontSize="xs"
                           >
-                            {emp.status === "active"
-                              ? "Active"
-                              : emp.status === "probation"
-                                ? "ทดลองงาน"
-                                : "ลาออก"}
+                            {emp.status === 'active'
+                              ? 'Active'
+                              : emp.status === 'probation'
+                                ? 'ทดลองงาน'
+                                : 'ลาออก'}
                           </Badge>
                         </Td>
                         <Td py="4">
@@ -1426,7 +1635,7 @@ const Employees = () => {
                               color="#FFF"
                               onClick={() => handleView(emp)}
                               aria-label="ดูรายละเอียด"
-                              bg={"#021841"}
+                              bg={'#021841'}
                             />
                             <IconButton
                               icon={<Trash2 size="14" />}
@@ -1435,7 +1644,7 @@ const Employees = () => {
                               color="#FFF"
                               onClick={() => handleDeleteConfirm(emp)}
                               aria-label="ลบ"
-                              bg={"red"}
+                              bg={'red'}
                             />
                           </HStack>
                         </Td>
@@ -1462,10 +1671,10 @@ const Employees = () => {
           <ModalCloseButton />
           <ModalBody>
             <Text>
-              คุณต้องการลบพนักงาน{" "}
+              คุณต้องการลบพนักงาน{' '}
               <b>
                 {deleteTarget?.firstNameTh} {deleteTarget?.lastNameTh}
-              </b>{" "}
+              </b>{' '}
               ({deleteTarget?.employeeId}) ใช่หรือไม่?
             </Text>
           </ModalBody>

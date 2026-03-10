@@ -6,12 +6,8 @@ import {
   Icon,
   Link as ChakraLink,
   Divider,
-} from "@chakra-ui/react";
-import {
-  NavLink as RouterLink,
-  useLocation,
-  useNavigate,
-} from "react-router-dom";
+} from '@chakra-ui/react';
+import { NavLink as RouterLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
@@ -25,9 +21,9 @@ import {
   BookOpen,
   LogOut,
   ChevronRight,
-} from "lucide-react";
-import { MdOutlineBarChart } from "react-icons/md";
-import { RiMoneyDollarCircleLine } from "react-icons/ri";
+} from 'lucide-react';
+import { MdOutlineBarChart } from 'react-icons/md';
+import { RiMoneyDollarCircleLine } from 'react-icons/ri';
 
 const NavItem = ({ icon, children, to, onClose }) => {
   const location = useLocation();
@@ -38,7 +34,7 @@ const NavItem = ({ icon, children, to, onClose }) => {
       as={RouterLink}
       to={to}
       w="100%"
-      style={{ textDecoration: "none" }}
+      style={{ textDecoration: 'none' }}
       onClick={onClose}
     >
       <Flex
@@ -49,14 +45,14 @@ const NavItem = ({ icon, children, to, onClose }) => {
         mr="4"
         borderRightRadius="full"
         borderLeft="4px solid"
-        borderColor={isActive ? "red.500" : "transparent"}
+        borderColor={isActive ? 'red.500' : 'transparent'}
         role="group"
         cursor="pointer"
-        bg={isActive ? "whiteAlpha.200" : "transparent"}
-        color={isActive ? "white" : "gray.400"}
+        bg={isActive ? 'whiteAlpha.200' : 'transparent'}
+        color={isActive ? 'white' : 'gray.400'}
         _hover={{
-          bg: "whiteAlpha.200",
-          color: "white",
+          bg: 'whiteAlpha.200',
+          color: 'white',
         }}
         transition="all 0.2s"
       >
@@ -64,10 +60,10 @@ const NavItem = ({ icon, children, to, onClose }) => {
           as={icon}
           mr="4"
           fontSize="20"
-          color={isActive ? "white" : "gray.400"}
-          _groupHover={{ color: "white" }}
+          color={isActive ? 'white' : 'gray.400'}
+          _groupHover={{ color: 'white' }}
         />
-        <Text fontSize="sm" fontWeight={isActive ? "600" : "500"}>
+        <Text fontSize="sm" fontWeight={isActive ? '600' : '500'}>
           {children}
         </Text>
       </Flex>
@@ -91,14 +87,14 @@ const SectionLabel = ({ children }) => (
 );
 
 const Sidebar = ({ onClose }) => {
-  const navigate = useNavigate();
+  // const navigate = useNavigate();
 
-  const handleLogout = () => {
-    localStorage.removeItem("user");
-    localStorage.removeItem("token");
-    navigate("/login");
-    if (onClose) onClose();
-  };
+  // const handleLogout = () => {
+  //   localStorage.removeItem('user');
+  //   localStorage.removeItem('token');
+  //   navigate('/login');
+  //   if (onClose) onClose();
+  // };
 
   return (
     <Flex
@@ -148,7 +144,7 @@ const Sidebar = ({ onClose }) => {
         >
           Commission
         </NavItem>
-        {JSON.parse(localStorage.getItem("user") || "{}").role === "admin" && (
+        {JSON.parse(localStorage.getItem('user') || '{}').role === 'admin' && (
           <>
             <SectionLabel>ระบบบุคลากร</SectionLabel>
             <NavItem icon={Users} to="/employees" onClose={onClose}>
@@ -161,57 +157,19 @@ const Sidebar = ({ onClose }) => {
             <NavItem icon={Calculator} to="/payroll" onClose={onClose}>
               คำนวณเงินเดือน
             </NavItem>
-            <NavItem icon={CreditCard} to="/payslip" onClose={onClose}>
-              ใบจ่ายเงินเดือน
+            <NavItem
+              icon={FileText}
+              to="/pay-social-security"
+              onClose={onClose}
+            >
+              หักประกันสังคม
             </NavItem>
           </>
         )}
+        <NavItem icon={CreditCard} to="/payslip" onClose={onClose}>
+          ใบจ่ายเงินเดือน
+        </NavItem>
       </VStack>
-
-      <Box mt="auto" w="full" pt="4" pb="2">
-        <Divider borderColor="whiteAlpha.400" />
-        <Box px="2" pt="2" w="full">
-          <Box
-            bg="whiteAlpha.200"
-            borderRadius="2xl"
-            p="3"
-            cursor="pointer"
-            role="group"
-            _hover={{
-              bg: "whiteAlpha.200",
-              transform: "translateY(-2px)",
-              boxShadow: "lg",
-            }}
-            transition="all 0.2s"
-            onClick={handleLogout}
-          >
-            <Flex justify="space-between" align="center">
-              <Box>
-                <Text fontSize="md" fontWeight="bold" color="white">
-                  ออกจากระบบ
-                </Text>
-              </Box>
-              <Flex
-                w="40px"
-                h="40px"
-                borderRadius="full"
-                bg="whiteAlpha.200"
-                align="center"
-                justify="center"
-                color="red.400"
-                _groupHover={{
-                  bg: "red.500",
-                  color: "white",
-                  transform: "scale(1.1)",
-                }}
-                transition="all 0.2s"
-              >
-                <Icon as={LogOut} boxSize={5} ml="1" />
-              </Flex>
-            </Flex>
-          </Box>
-        </Box>
-      </Box>
     </Flex>
   );
 };

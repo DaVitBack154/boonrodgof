@@ -3,8 +3,33 @@ const router = express.Router();
 const StudentCourse = require('../models/StudentCourse');
 const LessonRecord = require('../models/LessonRecord');
 const Employee = require('../models/Employee');
+const mongoose = require('mongoose');
 
-// POST /api/student-courses/test-lesson - สร้าง lesson สำหรับลูกค้าทดลองเรียน (Test)
+// Helper to update lessonsCompleted and status of a course
+async function updateCourseProgress(courseId) {
+  if (courseId === 'standalone') return;
+  
+  const StudentCourse = mongoose.model('StudentCourse');
+  const LessonRecord = mongoose.model('LessonRecord');
+  
+  const course = await StudentCourse.findById(courseId);
+  if (!course) return;
+
+  const count = await LessonRecord.countDocuments({
+    studentCourse: course._id,
+    status: { $in: ['completed', 'legacy', 'no_show'] }
+  });
+
+  course.lessonsCompleted = count;
+  if (count >= course.totalLessons) {
+    course.status = 'completed';
+  } else if (course.status === 'completed' && count < course.totalLessons) {
+    course.status = 'active';
+  }
+  
+  await course.save();
+  return course;
+}
 router.post('/test-lesson', async (req, res) => {
   try {
     const { testCustomerName, coach, lessonDate, referredBy, company, branch } = req.body;
@@ -59,7 +84,17 @@ router.get('/', async (req, res) => {
     const courses = await StudentCourse.find(filter)
       .populate('branch', 'name code')
       .sort('-createdAt');
-    res.json(courses);
+    
+    // Add legacyCount to each course
+    const coursesWithLegacy = await Promise.all(courses.map(async (c) => {
+      const legacyCount = await LessonRecord.countDocuments({
+        studentCourse: c._id,
+        status: 'legacy'
+      });
+      return { ...c.toObject(), legacyCount };
+    }));
+
+    res.json(coursesWithLegacy);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -76,7 +111,12 @@ router.get('/:id', async (req, res) => {
       .populate('coach', 'employeeId firstNameTh lastNameTh nickname position')
       .sort('lessonNumber');
 
-    res.json({ course, lessons });
+    const legacyCount = await LessonRecord.countDocuments({
+      studentCourse: course._id,
+      status: 'legacy'
+    });
+
+    res.json({ course: { ...course.toObject(), legacyCount }, lessons });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -144,10 +184,59 @@ router.put('/:id', async (req, res) => {
     const course = await StudentCourse.findById(req.params.id);
     if (!course) return res.status(404).json({ error: 'ไม่พบข้อมูลคอร์ส' });
 
-    Object.assign(course, req.body);
+    const { legacyLessons, ...updateData } = req.body;
+    Object.assign(course, updateData);
     await course.save(); // triggers pre-save hook to recalculate
+    
+    // Manage legacy records if legacyLessons is provided
+    if (legacyLessons !== undefined) {
+      const targetLegacyCount = parseInt(legacyLessons, 10) || 0;
+      const currentLegacyCount = await LessonRecord.countDocuments({
+        studentCourse: course._id,
+        status: 'legacy'
+      });
+
+      if (targetLegacyCount > currentLegacyCount) {
+        // Add more legacy records
+        const toAdd = [];
+        for (let i = currentLegacyCount + 1; i <= targetLegacyCount; i++) {
+          toAdd.push({
+            studentCourse: course._id,
+            lessonNumber: i, // This might clash if they have regular lessons, 
+                            // but usually legacy are the first ones. 
+                            // In a real scenario we'd need smarter lessonNumbering.
+                            // For now, follow the simple incremental logic.
+            lessonDate: course.startDate || Date.now(),
+            status: 'legacy',
+            notes: 'เพิ่มย้อนหลังจากการแก้ไขคอร์ส',
+            company: course.company,
+          });
+        }
+        if (toAdd.length > 0) await LessonRecord.insertMany(toAdd);
+      } else if (targetLegacyCount < currentLegacyCount) {
+        // Remove surplus legacy records (remove the latest ones)
+        const legacyRecords = await LessonRecord.find({
+          studentCourse: course._id,
+          status: 'legacy'
+        }).sort('-lessonNumber').limit(currentLegacyCount - targetLegacyCount);
+        
+        const idsToDelete = legacyRecords.map(r => r._id);
+        if (idsToDelete.length > 0) {
+          await LessonRecord.deleteMany({ _id: { $in: idsToDelete } });
+        }
+      }
+    }
+
+    // Recalculate progress
+    await updateCourseProgress(course._id);
+    
     const populated = await StudentCourse.findById(course._id).populate('branch', 'name code');
-    res.json(populated);
+    // Add legacyCount to response
+    const finalLegacyCount = await LessonRecord.countDocuments({
+      studentCourse: course._id,
+      status: 'legacy'
+    });
+    res.json({ ...populated.toObject(), legacyCount: finalLegacyCount });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -229,15 +318,7 @@ router.post('/:id/lessons', async (req, res) => {
     await lesson.save();
 
     // Update lessonsCompleted count
-    const completedCount = await LessonRecord.countDocuments({
-      studentCourse: course._id,
-      status: 'completed',
-    });
-    course.lessonsCompleted = completedCount;
-    if (completedCount >= course.totalLessons) {
-      course.status = 'completed';
-    }
-    await course.save();
+    await updateCourseProgress(course._id);
 
     const populated = await LessonRecord.findById(lesson._id)
       .populate('coach', 'employeeId firstNameTh lastNameTh nickname position');
@@ -292,16 +373,7 @@ router.put('/:courseId/lessons/:lessonId', async (req, res) => {
 
     // Update lessonsCompleted count if not a standalone test lesson
     if (req.params.courseId !== 'standalone') {
-      const course = await StudentCourse.findById(req.params.courseId);
-      if (course) {
-        const completedCount = await LessonRecord.countDocuments({
-          studentCourse: course._id,
-          status: 'completed',
-        });
-        course.lessonsCompleted = completedCount;
-        course.status = completedCount >= course.totalLessons ? 'completed' : 'active';
-        await course.save();
-      }
+      await updateCourseProgress(req.params.courseId);
     }
 
     res.json(lesson);
@@ -317,16 +389,7 @@ router.delete('/:courseId/lessons/:lessonId', async (req, res) => {
 
     // Update lessonsCompleted count if not a standalone test lesson
     if (req.params.courseId !== 'standalone') {
-      const course = await StudentCourse.findById(req.params.courseId);
-      if (course) {
-        const completedCount = await LessonRecord.countDocuments({
-          studentCourse: course._id,
-          status: 'completed',
-        });
-        course.lessonsCompleted = completedCount;
-        course.status = completedCount >= course.totalLessons ? 'completed' : 'active';
-        await course.save();
-      }
+      await updateCourseProgress(req.params.courseId);
     }
 
     res.json({ message: 'ลบเรียบร้อย' });

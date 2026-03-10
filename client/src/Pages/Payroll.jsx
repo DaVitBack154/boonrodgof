@@ -135,12 +135,20 @@ const CommissionDetailModal = ({
   }, [isOpen, coachId, period]);
 
   const filteredDetails = useMemo(() => {
-    if (!company) return details;
+    if (!company || company === "หลายบริษัท") return details;
     return details.filter((item) => item.studentCourse?.company === company);
   }, [details, company]);
 
-  const totalCom = filteredDetails.reduce((sum, item) => {
-    if (!item.studentCourse) return sum;
+  const totalComAll = details.reduce((sum, item) => {
+    const lessonRate =
+      item.commissionRate != null
+        ? item.commissionRate
+        : item.studentCourse?.commissionRate || 0;
+    const perLessonRate = item.studentCourse?.perLessonRate || 0;
+    return sum + Math.round(((perLessonRate * lessonRate) / 100) * 100) / 100;
+  }, 0);
+
+  const totalComCompany = filteredDetails.reduce((sum, item) => {
     const lessonRate =
       item.commissionRate != null
         ? item.commissionRate
@@ -191,7 +199,7 @@ const CommissionDetailModal = ({
                   </Tr>
                 </Thead>
                 <Tbody>
-                  {filteredDetails.map((item) => {
+                  {details.map((item) => {
                     const lessonRate =
                       item.commissionRate != null
                         ? item.commissionRate
@@ -201,8 +209,19 @@ const CommissionDetailModal = ({
                     const comPerLesson =
                       Math.round(((perLessonRate * lessonRate) / 100) * 100) /
                       100;
+                    const isCurrentCompany =
+                      company &&
+                      company !== "หลายบริษัท" &&
+                      item.studentCourse?.company === company;
+
                     return (
-                      <Tr key={item._id} _hover={{ bg: "gray.50" }}>
+                      <Tr
+                        key={item._id}
+                        _hover={{ bg: "gray.50" }}
+                        bg={isCurrentCompany ? "green.50" : "transparent"}
+                        borderLeft={isCurrentCompany ? "4px solid" : "none"}
+                        borderLeftColor="green.400"
+                      >
                         <Td>
                           {dayjs(item.lessonDate).format("DD MMM YYYY HH:mm")}
                         </Td>
@@ -222,20 +241,81 @@ const CommissionDetailModal = ({
                     );
                   })}
                 </Tbody>
-                <Tfoot bg="green.50">
+                <Tfoot bg="gray.50">
                   <Tr>
-                    <Th colSpan={6} textAlign="right" py="3">
-                      รวมค่าคอมมิชชั่น
-                    </Th>
-                    <Th
-                      isNumeric
-                      py="3"
-                      color="green.700"
-                      fontWeight="bold"
-                      fontSize="md"
-                    >
-                      {fmt(totalCom)}
-                    </Th>
+                    <Td colSpan={7} px="0" pt="4">
+                      <Flex
+                        bg="white"
+                        p="4"
+                        borderRadius="xl"
+                        border="1px solid"
+                        borderColor="gray.100"
+                        justify="space-between"
+                        shadow="sm"
+                      >
+                        <HStack spacing="8">
+                          {company && company !== "หลายบริษัท" && (
+                            <Box>
+                              <Text fontSize="xs" color="gray.500">
+                                ยอดบริษัทนี้ ({company})
+                              </Text>
+                              <Text
+                                fontSize="md"
+                                fontWeight="bold"
+                                color="green.600"
+                              >
+                                ฿{fmt(totalComCompany)}
+                              </Text>
+                            </Box>
+                          )}
+                          <Box>
+                            <Text fontSize="xs" color="gray.500">
+                              {company && company !== "หลายบริษัท"
+                                ? "ยอดบริษัทอื่นๆ"
+                                : "ยอดรวมทุกบริษัท"}
+                            </Text>
+                            <Text
+                              fontSize="md"
+                              fontWeight="bold"
+                              color={
+                                company && company !== "หลายบริษัท"
+                                  ? "gray.600"
+                                  : "brand.700"
+                              }
+                            >
+                              ฿
+                              {fmt(
+                                totalComAll -
+                                  (company && company !== "หลายบริษัท"
+                                    ? totalComCompany
+                                    : 0),
+                              )}
+                            </Text>
+                          </Box>
+                        </HStack>
+                        <Box
+                          textAlign="right"
+                          borderLeft="1px solid"
+                          borderColor="gray.100"
+                          pl="8"
+                        >
+                          <Text
+                            fontSize="xs"
+                            color="gray.500"
+                            fontWeight="bold"
+                          >
+                            รวมทั้งหมด
+                          </Text>
+                          <Text
+                            fontSize="xl"
+                            fontWeight="bold"
+                            color="brand.700"
+                          >
+                            ฿{fmt(totalComAll)}
+                          </Text>
+                        </Box>
+                      </Flex>
+                    </Td>
                   </Tr>
                 </Tfoot>
               </Table>
@@ -608,8 +688,45 @@ const Payroll = () => {
   };
 
   const tabRecords = useMemo(() => {
-    if (!companyFilter) return records;
-    return records.filter((r) => r.company === companyFilter);
+    if (companyFilter) {
+      return records.filter((r) => r.company === companyFilter);
+    }
+    // หากเป็น "ยอดรวมทั้งหมด" (companyFilter === "") ให้ group โดย employee
+    const grouped = records.reduce((acc, r) => {
+      const empId = r.employee?._id;
+      if (!empId) return acc;
+      if (!acc[empId]) {
+        acc[empId] = {
+          ...r,
+          company: "หลายบริษัท", // ระบุว่ารวมมา
+          records: [r],
+        };
+      } else {
+        // บวกยอดเพิ่ม
+        acc[empId].baseSalary =
+          (acc[empId].baseSalary || 0) + (r.baseSalary || 0);
+        acc[empId].commissionAmount =
+          (acc[empId].commissionAmount || 0) + (r.commissionAmount || 0);
+        acc[empId].salesBonus =
+          (acc[empId].salesBonus || 0) + (r.salesBonus || 0);
+        acc[empId].totalIncome =
+          (acc[empId].totalIncome || 0) + (r.totalIncome || 0);
+        acc[empId].withholdingTax =
+          (acc[empId].withholdingTax || 0) + (r.withholdingTax || 0);
+        acc[empId].socialSecurity =
+          (acc[empId].socialSecurity || 0) + (r.socialSecurity || 0);
+        acc[empId].otherDeductions =
+          (acc[empId].otherDeductions || 0) + (r.otherDeductions || 0);
+        acc[empId].parttimeWithholding =
+          (acc[empId].parttimeWithholding || 0) + (r.parttimeWithholding || 0);
+        acc[empId].totalDeductions =
+          (acc[empId].totalDeductions || 0) + (r.totalDeductions || 0);
+        acc[empId].netPay = (acc[empId].netPay || 0) + (r.netPay || 0);
+        acc[empId].records.push(r);
+      }
+      return acc;
+    }, {});
+    return Object.values(grouped);
   }, [records, companyFilter]);
 
   const totals = tabRecords.reduce(

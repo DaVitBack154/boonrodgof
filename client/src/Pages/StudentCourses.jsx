@@ -32,7 +32,7 @@ import {
   Divider,
   IconButton,
   Tooltip,
-} from "@chakra-ui/react";
+} from '@chakra-ui/react';
 import {
   Plus,
   ChevronLeft,
@@ -42,8 +42,8 @@ import {
   User,
   BookOpen,
   Save,
-} from "lucide-react";
-import { useState, useEffect } from "react";
+} from 'lucide-react';
+import { useState, useEffect } from 'react';
 import {
   getStudentCourses,
   getStudentCourse,
@@ -54,15 +54,34 @@ import {
   deleteLesson,
   getEmployees,
   getBranches,
-} from "../services/api";
+} from '../services/api';
 
 const fmt = (n) =>
-  (n || 0).toLocaleString("th-TH", {
+  (n || 0).toLocaleString('th-TH', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
 
 const COMMISSION_RATES = [40, 45, 50, 55, 60, 70];
+const COURSE_STATUS_OPTIONS = [
+  { value: 'active', label: 'กำลังเรียน' },
+  { value: 'completed', label: 'เรียนครบ' },
+  { value: 'cancelled', label: 'หยุดเรียน' },
+  { value: 'expired', label: 'หมดอายุ' },
+];
+
+const getCourseStatusLabel = (status) => {
+  const option = COURSE_STATUS_OPTIONS.find((item) => item.value === status);
+  return option?.label || 'ไม่ระบุ';
+};
+
+const getCourseStatusColor = (status) => {
+  if (status === 'active') return 'blue';
+  if (status === 'completed') return 'green';
+  if (status === 'cancelled') return 'red';
+  if (status === 'expired') return 'orange';
+  return 'gray';
+};
 
 // ===== Course Detail View =====
 const CourseDetailView = ({ courseId, onBack }) => {
@@ -72,10 +91,10 @@ const CourseDetailView = ({ courseId, onBack }) => {
   const [loading, setLoading] = useState(true);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [newLesson, setNewLesson] = useState({
-    coach: "",
-    lessonDate: "",
+    coach: '',
+    lessonDate: '',
     lessonNumber: 1,
-    status: "completed",
+    status: 'completed',
   });
   const toast = useToast();
 
@@ -88,7 +107,7 @@ const CourseDetailView = ({ courseId, onBack }) => {
       ]);
       setCourse(courseData.course);
       setLessons(courseData.lessons);
-      setCoaches(empData.filter((e) => e.status === "active"));
+      setCoaches(empData.filter((e) => e.status === 'active'));
       // Set next lesson number
       const maxLesson =
         courseData.lessons.length > 0
@@ -96,7 +115,7 @@ const CourseDetailView = ({ courseId, onBack }) => {
           : 0;
       setNewLesson((prev) => ({ ...prev, lessonNumber: maxLesson + 1 }));
     } catch (err) {
-      toast({ title: "โหลดข้อมูลล้มเหลว", status: "error", duration: 2000 });
+      toast({ title: 'โหลดข้อมูลล้มเหลว', status: 'error', duration: 2000 });
     }
     setLoading(false);
   };
@@ -108,8 +127,8 @@ const CourseDetailView = ({ courseId, onBack }) => {
   const handleAddLesson = async () => {
     if (!newLesson.coach || !newLesson.lessonDate) {
       toast({
-        title: "กรุณาเลือกเทรนเนอร์และวันที่",
-        status: "warning",
+        title: 'กรุณาเลือกเทรนเนอร์และวันที่',
+        status: 'warning',
         duration: 2000,
       });
       return;
@@ -117,17 +136,17 @@ const CourseDetailView = ({ courseId, onBack }) => {
     try {
       await addLesson(courseId, newLesson);
       toast({
-        title: "เพิ่มบันทึกการเรียนเรียบร้อย",
-        status: "success",
+        title: 'เพิ่มบันทึกการเรียนเรียบร้อย',
+        status: 'success',
         duration: 2000,
       });
       onClose();
       fetchData();
     } catch (err) {
       toast({
-        title: "เพิ่มไม่สำเร็จ",
+        title: 'เพิ่มไม่สำเร็จ',
         description: err.response?.data?.error || err.message,
-        status: "error",
+        status: 'error',
         duration: 3000,
       });
     }
@@ -136,10 +155,10 @@ const CourseDetailView = ({ courseId, onBack }) => {
   const handleDeleteLesson = async (lessonId) => {
     try {
       await deleteLesson(courseId, lessonId);
-      toast({ title: "ลบเรียบร้อย", status: "success", duration: 1500 });
+      toast({ title: 'ลบเรียบร้อย', status: 'success', duration: 1500 });
       fetchData();
     } catch (err) {
-      toast({ title: "ลบไม่สำเร็จ", status: "error", duration: 2000 });
+      toast({ title: 'ลบไม่สำเร็จ', status: 'error', duration: 2000 });
     }
   };
 
@@ -162,8 +181,8 @@ const CourseDetailView = ({ courseId, onBack }) => {
         mb="4"
         onClick={onBack}
         leftIcon={<ChevronLeft size="16" />}
-        bg={"#021841"}
-        _hover={{ bg: "#021841" }}
+        bg={'#021841'}
+        _hover={{ bg: '#021841' }}
         color="#FFF"
       >
         กลับไปรายการคอร์ส
@@ -184,29 +203,19 @@ const CourseDetailView = ({ courseId, onBack }) => {
             <Box>
               <Heading size="md">{course.studentName}</Heading>
               <Text fontSize="sm" color="whiteAlpha.700" mt="1">
-                ราคาคอร์ส: ฿{fmt(course.packagePrice)} | {course.totalLessons}{" "}
+                ราคาคอร์ส: ฿{fmt(course.packagePrice)} | {course.totalLessons}{' '}
                 ครั้ง | Commission {course.commissionRate}%
               </Text>
             </Box>
             <Badge
-              colorScheme={
-                course.status === "active"
-                  ? "green"
-                  : course.status === "completed"
-                    ? "blue"
-                    : "red"
-              }
+              colorScheme={getCourseStatusColor(course.status)}
               variant="solid"
               borderRadius="full"
               px="4"
               py="1"
               fontSize="sm"
             >
-              {course.status === "active"
-                ? "กำลังเรียน"
-                : course.status === "completed"
-                  ? "เรียนครบ"
-                  : "หมดอายุ"}
+              {getCourseStatusLabel(course.status)}
             </Badge>
           </Flex>
         </Box>
@@ -266,7 +275,7 @@ const CourseDetailView = ({ courseId, onBack }) => {
           </Flex>
           <Box bg="gray.100" borderRadius="full" h="8px" overflow="hidden">
             <Box
-              bg={progressPercent >= 100 ? "green.400" : "brand.500"}
+              bg={progressPercent >= 100 ? 'green.400' : 'brand.500'}
               h="full"
               w={`${Math.min(100, progressPercent)}%`}
               borderRadius="full"
@@ -283,9 +292,9 @@ const CourseDetailView = ({ courseId, onBack }) => {
         </Heading>
         <Button
           size="sm"
-          bg={"#021841"}
+          bg={'#021841'}
           color="white"
-          _hover={{ bg: "#021841" }}
+          _hover={{ bg: '#021841' }}
           borderRadius="lg"
           leftIcon={<Plus size="14" />}
           onClick={onOpen}
@@ -350,7 +359,7 @@ const CourseDetailView = ({ courseId, onBack }) => {
               {[...lessons]
                 .sort((a, b) => b.lessonNumber - a.lessonNumber)
                 .map((lesson) => (
-                  <Tr key={lesson._id} _hover={{ bg: "blue.50" }}>
+                  <Tr key={lesson._id} _hover={{ bg: 'blue.50' }}>
                     <Td
                       py="3"
                       fontWeight="bold"
@@ -363,23 +372,23 @@ const CourseDetailView = ({ courseId, onBack }) => {
                       <Flex align="center" gap="2">
                         <Calendar size="14" color="#718096" />
                         {new Date(lesson.lessonDate).toLocaleDateString(
-                          "th-TH",
+                          'th-TH',
                           {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
                           },
                         )}
                         <Text color="gray.400" fontSize="xs">
                           {new Date(lesson.lessonDate).toLocaleTimeString(
-                            "th-TH",
-                            { hour: "2-digit", minute: "2-digit" },
+                            'th-TH',
+                            { hour: '2-digit', minute: '2-digit' },
                           )}
                         </Text>
                       </Flex>
                     </Td>
                     <Td py="3">
-                      {lesson.status === "legacy" ? (
+                      {lesson.status === 'legacy' ? (
                         <Flex align="center" gap="2" opacity="0.6">
                           <Text fontSize="sm" color="gray.500">
                             -
@@ -392,7 +401,7 @@ const CourseDetailView = ({ courseId, onBack }) => {
                             name={
                               lesson.coach
                                 ? `${lesson.coach.firstNameTh} ${lesson.coach.lastNameTh}`
-                                : ""
+                                : ''
                             }
                             bg="brand.100"
                             color="brand.700"
@@ -403,7 +412,7 @@ const CourseDetailView = ({ courseId, onBack }) => {
                               fontWeight="medium"
                               color="gray.800"
                             >
-                              {lesson.coach?.firstNameTh}{" "}
+                              {lesson.coach?.firstNameTh}{' '}
                               {lesson.coach?.lastNameTh}
                             </Text>
                             <Text fontSize="xs" color="gray.400">
@@ -419,16 +428,16 @@ const CourseDetailView = ({ courseId, onBack }) => {
                       isNumeric
                       fontWeight="bold"
                       color={
-                        lesson.status === "legacy" ? "gray.400" : "green.600"
+                        lesson.status === 'legacy' ? 'gray.400' : 'green.600'
                       }
                       fontSize="sm"
                     >
-                      {lesson.status === "legacy"
-                        ? "-"
+                      {lesson.status === 'legacy'
+                        ? '-'
                         : `฿${fmt(course.commissionPerLesson)}`}
                     </Td>
                     <Td py="3" textAlign="center">
-                      {lesson.status === "legacy" ? (
+                      {lesson.status === 'legacy' ? (
                         <Badge
                           bg="gray.200"
                           color="gray.600"
@@ -442,27 +451,27 @@ const CourseDetailView = ({ courseId, onBack }) => {
                       ) : (
                         <Badge
                           colorScheme={
-                            lesson.status === "completed"
-                              ? "green"
-                              : lesson.status === "no_show"
-                                ? "red"
-                                : "gray"
+                            lesson.status === 'completed'
+                              ? 'green'
+                              : lesson.status === 'no_show'
+                                ? 'red'
+                                : 'gray'
                           }
                           variant="subtle"
                           borderRadius="full"
                           px="2"
                           fontSize="xs"
                         >
-                          {lesson.status === "completed"
-                            ? "เรียนแล้ว"
-                            : lesson.status === "no_show"
-                              ? "ไม่มา"
-                              : "ยกเลิก"}
+                          {lesson.status === 'completed'
+                            ? 'เรียนแล้ว'
+                            : lesson.status === 'no_show'
+                              ? 'ไม่มา'
+                              : 'ยกเลิก'}
                         </Badge>
                       )}
                     </Td>
                     <Td py="3">
-                      {lesson.status !== "legacy" && (
+                      {lesson.status !== 'legacy' && (
                         <IconButton
                           icon={<Trash2 size="12" />}
                           size="xs"
@@ -567,9 +576,9 @@ const CourseDetailView = ({ courseId, onBack }) => {
               ยกเลิก
             </Button>
             <Button
-              bg={"#021841"}
+              bg={'#021841'}
               color="white"
-              _hover={{ bg: "#021841" }}
+              _hover={{ bg: '#021841' }}
               onClick={handleAddLesson}
             >
               เพิ่ม
@@ -587,19 +596,23 @@ const StudentCourses = () => {
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCourseId, setSelectedCourseId] = useState(null);
-  const [filterBranch, setFilterBranch] = useState("");
+  const [filterBranch, setFilterBranch] = useState('');
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [newCourse, setNewCourse] = useState({
-    studentName: "",
-    packagePrice: "",
-    totalLessons: "",
+    studentName: '',
+    packagePrice: '',
+    totalLessons: '',
     commissionRate: 40,
-    branch: "",
-    company: "",
-    legacyLessons: "",
+    branch: '',
+    company: '',
+    legacyLessons: '',
   });
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [updatingStatusId, setUpdatingStatusId] = useState('');
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+  const [statusTargetCourse, setStatusTargetCourse] = useState(null);
+  const [statusDraft, setStatusDraft] = useState('active');
   const toast = useToast();
 
   const fetchData = async () => {
@@ -614,7 +627,7 @@ const StudentCourses = () => {
       setCourses(coursesData);
       setBranches(branchesData);
     } catch (err) {
-      toast({ title: "โหลดข้อมูลล้มเหลว", status: "error", duration: 2000 });
+      toast({ title: 'โหลดข้อมูลล้มเหลว', status: 'error', duration: 2000 });
     }
     setLoading(false);
   };
@@ -627,13 +640,13 @@ const StudentCourses = () => {
     setIsEditMode(false);
     setEditingId(null);
     setNewCourse({
-      studentName: "",
-      packagePrice: "",
-      totalLessons: "",
+      studentName: '',
+      packagePrice: '',
+      totalLessons: '',
       commissionRate: 40,
-      branch: "",
-      company: "",
-      legacyLessons: "",
+      branch: '',
+      company: '',
+      legacyLessons: '',
     });
     onOpen();
   };
@@ -646,9 +659,9 @@ const StudentCourses = () => {
       packagePrice: course.packagePrice.toString(),
       totalLessons: course.totalLessons.toString(),
       commissionRate: course.commissionRate,
-      branch: course.branch?._id || course.branch || "",
-      company: course.company || "",
-      legacyLessons: "0", // legacy lessons shouldn't be edited here ideally, or kept as 0
+      branch: course.branch?.[0]?._id || course.branch?.[0] || '',
+      company: course.company || '',
+      legacyLessons: course.legacyCount || '0',
     });
     onOpen();
   };
@@ -660,8 +673,8 @@ const StudentCourses = () => {
       !newCourse.totalLessons
     ) {
       toast({
-        title: "กรุณากรอกข้อมูลให้ครบ",
-        status: "warning",
+        title: 'กรุณากรอกข้อมูลให้ครบ',
+        status: 'warning',
         duration: 2000,
       });
       return;
@@ -674,8 +687,8 @@ const StudentCourses = () => {
           totalLessons: Number(newCourse.totalLessons),
         });
         toast({
-          title: "แก้ไขคอร์สเรียบร้อย",
-          status: "success",
+          title: 'แก้ไขคอร์สเรียบร้อย',
+          status: 'success',
           duration: 2000,
         });
       } else {
@@ -686,8 +699,8 @@ const StudentCourses = () => {
           legacyLessons: Number(newCourse.legacyLessons || 0),
         });
         toast({
-          title: "เพิ่มคอร์สเรียบร้อย",
-          status: "success",
+          title: 'เพิ่มคอร์สเรียบร้อย',
+          status: 'success',
           duration: 2000,
         });
       }
@@ -695,9 +708,9 @@ const StudentCourses = () => {
       fetchData();
     } catch (err) {
       toast({
-        title: isEditMode ? "แก้ไขไม่สำเร็จ" : "เพิ่มไม่สำเร็จ",
+        title: isEditMode ? 'แก้ไขไม่สำเร็จ' : 'เพิ่มไม่สำเร็จ',
         description: err.response?.data?.error || err.message,
-        status: "error",
+        status: 'error',
         duration: 3000,
       });
     }
@@ -706,11 +719,56 @@ const StudentCourses = () => {
   const handleDelete = async (id) => {
     try {
       await deleteStudentCourse(id);
-      toast({ title: "ลบเรียบร้อย", status: "success", duration: 1500 });
+      toast({ title: 'ลบเรียบร้อย', status: 'success', duration: 1500 });
       fetchData();
     } catch (err) {
-      toast({ title: "ลบไม่สำเร็จ", status: "error", duration: 2000 });
+      toast({ title: 'ลบไม่สำเร็จ', status: 'error', duration: 2000 });
     }
+  };
+
+  const handleStatusChange = async (course, nextStatus) => {
+    if (!nextStatus || nextStatus === course.status) return;
+    try {
+      setUpdatingStatusId(course._id);
+      await updateStudentCourse(course._id, { status: nextStatus });
+      setCourses((prev) =>
+        prev.map((item) =>
+          item._id === course._id ? { ...item, status: nextStatus } : item,
+        ),
+      );
+      toast({
+        title: `อัปเดตสถานะเป็น ${getCourseStatusLabel(nextStatus)} แล้ว`,
+        status: 'success',
+        duration: 2000,
+      });
+    } catch (err) {
+      toast({
+        title: 'อัปเดตสถานะไม่สำเร็จ',
+        description: err.response?.data?.error || err.message,
+        status: 'error',
+        duration: 3000,
+      });
+    } finally {
+      setUpdatingStatusId('');
+    }
+  };
+
+  const handleOpenStatusModal = (course) => {
+    setStatusTargetCourse(course);
+    setStatusDraft(course.status || 'active');
+    setIsStatusModalOpen(true);
+  };
+
+  const handleCloseStatusModal = () => {
+    setIsStatusModalOpen(false);
+    setStatusTargetCourse(null);
+    setStatusDraft('active');
+  };
+
+  const handleConfirmStatusChange = async () => {
+    if (!statusTargetCourse) return;
+    await handleStatusChange(statusTargetCourse, statusDraft);
+    handleCloseStatusModal();
   };
 
   if (selectedCourseId) {
@@ -746,7 +804,7 @@ const StudentCourses = () => {
           leftIcon={<Plus size="18" />}
           bg="#021841"
           color="white"
-          _hover={{ bg: "#021841" }}
+          _hover={{ bg: '#021841' }}
           borderRadius="lg"
           px="6"
           boxShadow="sm"
@@ -789,8 +847,8 @@ const StudentCourses = () => {
             </Select>
           </Box>
           <Text fontSize="sm" color="gray.400">
-            {courses.length} คอร์ส | Active{" "}
-            {courses.filter((c) => c.status === "active").length}
+            {courses.length} คอร์ส | Active{' '}
+            {courses.filter((c) => c.status === 'active').length}
           </Text>
         </Flex>
       </Box>
@@ -885,13 +943,13 @@ const StudentCourses = () => {
                 {courses.map((c, i) => (
                   <Tr
                     key={c._id}
-                    _hover={{ bg: "blue.50", cursor: "pointer" }}
+                    _hover={{ bg: 'blue.50', cursor: 'pointer' }}
                     transition="background 0.15s"
                     bg={
-                      c.status === "completed"
-                        ? "green.50"
-                        : c.status === "expired" || c.status === "cancelled"
-                          ? "red.50"
+                      c.status === 'completed'
+                        ? 'green.50'
+                        : c.status === 'expired' || c.status === 'cancelled'
+                          ? 'red.50'
                           : undefined
                     }
                   >
@@ -981,37 +1039,31 @@ const StudentCourses = () => {
                         fontWeight="bold"
                         color={
                           c.lessonsCompleted >= c.totalLessons
-                            ? "green.600"
-                            : "blue.600"
+                            ? 'green.600'
+                            : 'blue.600'
                         }
                       >
                         {c.lessonsCompleted}/{c.totalLessons}
                       </Text>
                     </Td>
-                    <Td
-                      py="3"
-                      textAlign="center"
-                      onClick={() => setSelectedCourseId(c._id)}
-                    >
-                      <Badge
-                        colorScheme={
-                          c.status === "active"
-                            ? "#2f5855"
-                            : c.status === "completed"
-                              ? "#2f5855"
-                              : "#2f5855"
-                        }
-                        variant="subtle"
-                        borderRadius="full"
-                        px="2"
-                        fontSize="xs"
-                      >
-                        {c.status === "active"
-                          ? "Active"
-                          : c.status === "completed"
-                            ? "เรียนครบ"
-                            : "หมดอายุ"}
-                      </Badge>
+                    <Td py="3" textAlign="center">
+                      <Tooltip label="คลิกเพื่อเปลี่ยนสถานะ" hasArrow>
+                        <Badge
+                          colorScheme={getCourseStatusColor(c.status)}
+                          variant="subtle"
+                          borderRadius="full"
+                          px="2"
+                          py="1"
+                          fontSize="xs"
+                          cursor="pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenStatusModal(c);
+                          }}
+                        >
+                          {getCourseStatusLabel(c.status)}
+                        </Badge>
+                      </Tooltip>
                     </Td>
                     <Td py="3">
                       <HStack spacing="1">
@@ -1025,7 +1077,7 @@ const StudentCourses = () => {
                             handleEditClick(c);
                           }}
                           aria-label="แก้ไข"
-                          bg={"#021841"}
+                          bg={'#021841'}
                         />
                         <IconButton
                           icon={<Trash2 size="14" />}
@@ -1037,7 +1089,7 @@ const StudentCourses = () => {
                             handleDelete(c._id);
                           }}
                           aria-label="ลบ"
-                          bg={"red"}
+                          bg={'red'}
                         />
                       </HStack>
                     </Td>
@@ -1054,12 +1106,63 @@ const StudentCourses = () => {
         )}
       </Box>
 
+      <Modal
+        isOpen={isStatusModalOpen}
+        onClose={handleCloseStatusModal}
+        isCentered
+        size="sm"
+      >
+        <ModalOverlay />
+        <ModalContent borderRadius="2xl">
+          <ModalHeader>เปลี่ยนสถานะคอร์ส</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody pb="4">
+            <Text fontSize="sm" color="gray.600" mb="3">
+              {statusTargetCourse?.studentName || '-'}
+            </Text>
+            <FormControl>
+              <FormLabel fontSize="sm" fontWeight="semibold" color="gray.600">
+                สถานะ
+              </FormLabel>
+              <Select
+                value={statusDraft}
+                onChange={(e) => setStatusDraft(e.target.value)}
+                bg="gray.50"
+                borderColor="gray.200"
+              >
+                {COURSE_STATUS_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            </FormControl>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" mr="3" onClick={handleCloseStatusModal}>
+              ยกเลิก
+            </Button>
+            <Button
+              bg="#021841"
+              color="white"
+              _hover={{ bg: '#021841' }}
+              onClick={handleConfirmStatusChange}
+              isDisabled={
+                !statusTargetCourse || updatingStatusId === statusTargetCourse?._id
+              }
+            >
+              บันทึกสถานะ
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
       {/* Add Course Modal */}
       <Modal isOpen={isOpen} onClose={onClose} isCentered size="lg">
         <ModalOverlay />
         <ModalContent borderRadius="2xl">
           <ModalHeader>
-            {isEditMode ? "แก้ไขข้อมูลคอร์ส" : "เพิ่มคอร์สลูกค้าใหม่"}
+            {isEditMode ? 'แก้ไขข้อมูลคอร์ส' : 'เพิ่มคอร์สลูกค้าใหม่'}
           </ModalHeader>
           <ModalCloseButton />
           <ModalBody pb="6">
@@ -1093,18 +1196,18 @@ const StudentCourses = () => {
                     const selectedBranch = branches.find(
                       (b) => b._id === branchId,
                     );
-                    const branchCode = selectedBranch?.code || "";
+                    const branchCode = selectedBranch?.code || '';
 
-                    let autoCompany = "";
-                    if (branchCode === "teeoff") {
-                      autoCompany = "บุญรอดกอล์ฟพัฒนา";
+                    let autoCompany = '';
+                    if (branchCode === 'teeoff') {
+                      autoCompany = 'บุญรอดกอล์ฟพัฒนา';
                     } else if (
-                      branchCode === "srinakarin" ||
-                      branchCode === "suwannaphum"
+                      branchCode === 'srinakarin' ||
+                      branchCode === 'suwannaphum'
                     ) {
-                      autoCompany = "บุญรอดกอล์ฟโทเทิล";
-                    } else if (branchCode === "ratchada") {
-                      autoCompany = ""; // let user choose
+                      autoCompany = 'บุญรอดกอล์ฟโทเทิล';
+                    } else if (branchCode === 'ratchada') {
+                      autoCompany = ''; // let user choose
                     }
 
                     setNewCourse((p) => ({
@@ -1126,8 +1229,8 @@ const StudentCourses = () => {
                 const selectedBranch = branches.find(
                   (b) => b._id === newCourse.branch,
                 );
-                const branchCode = selectedBranch?.code || "";
-                const showCompanySelect = branchCode === "ratchada";
+                const branchCode = selectedBranch?.code || '';
+                const showCompanySelect = branchCode === 'ratchada';
                 const autoCompanyLabel = newCourse.company;
 
                 if (showCompanySelect) {
@@ -1222,31 +1325,26 @@ const StudentCourses = () => {
                   placeholder="25"
                 />
               </FormControl>
-              {!isEditMode && (
-                <FormControl>
-                  <FormLabel
-                    fontSize="sm"
-                    fontWeight="semibold"
-                    color="gray.600"
-                  >
-                    จำนวนครั้งที่เรียนไปแล้ว
-                  </FormLabel>
-                  <Input
-                    bg="gray.50"
-                    border="none"
-                    borderRadius="lg"
-                    type="number"
-                    value={newCourse.legacyLessons}
-                    onChange={(e) =>
-                      setNewCourse((p) => ({
-                        ...p,
-                        legacyLessons: e.target.value,
-                      }))
-                    }
-                    placeholder="ถ้ามีการเรียนไปแล้วให้ระบุตัวเลขลงไป"
-                  />
-                </FormControl>
-              )}
+              <FormControl>
+                <FormLabel fontSize="sm" fontWeight="semibold" color="gray.600">
+                  จำนวนครั้งที่เรียนไปแล้ว
+                </FormLabel>
+                <Input
+                  bg="gray.50"
+                  border="none"
+                  borderRadius="lg"
+                  type="number"
+                  value={newCourse.legacyLessons}
+                  onChange={(e) =>
+                    setNewCourse((p) => ({
+                      ...p,
+                      legacyLessons: e.target.value,
+                    }))
+                  }
+                  placeholder="ถ้ามีการเรียนไปแล้วให้ระบุตัวเลขลงไป"
+                />
+              </FormControl>
+
               <FormControl>
                 <FormLabel fontSize="sm" fontWeight="semibold" color="gray.600">
                   Commission Rate
@@ -1295,7 +1393,7 @@ const StudentCourses = () => {
                     หัก 7%: <b>฿{fmt(Number(newCourse.packagePrice) * 0.93)}</b>
                   </Text>
                   <Text>
-                    ราคา/ครั้ง:{" "}
+                    ราคา/ครั้ง:{' '}
                     <b>
                       ฿
                       {fmt(
@@ -1305,7 +1403,7 @@ const StudentCourses = () => {
                     </b>
                   </Text>
                   <Text>
-                    คอม/ครั้ง:{" "}
+                    คอม/ครั้ง:{' '}
                     <b>
                       ฿
                       {fmt(
@@ -1327,10 +1425,10 @@ const StudentCourses = () => {
             <Button
               bg="#021841"
               color="white"
-              _hover={{ bg: "#021841" }}
+              _hover={{ bg: '#021841' }}
               onClick={handleSubmitCourse}
             >
-              {isEditMode ? "บันทึกการแก้ไข" : "เพิ่มคอร์ส"}
+              {isEditMode ? 'บันทึกการแก้ไข' : 'เพิ่มคอร์ส'}
             </Button>
           </ModalFooter>
         </ModalContent>

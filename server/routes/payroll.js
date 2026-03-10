@@ -7,9 +7,18 @@ const { calculatePayroll } = require('../utils/payrollCalculator');
 
 // Thai month names for labels
 const THAI_MONTHS = [
-  'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน',
-  'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม',
-  'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+  'มกราคม',
+  'กุมภาพันธ์',
+  'มีนาคม',
+  'เมษายน',
+  'พฤษภาคม',
+  'มิถุนายน',
+  'กรกฎาคม',
+  'สิงหาคม',
+  'กันยายน',
+  'ตุลาคม',
+  'พฤศจิกายน',
+  'ธันวาคม',
 ];
 
 /**
@@ -17,7 +26,7 @@ const THAI_MONTHS = [
  */
 async function getCoachCommission(coachId, period, company) {
   const [year, month] = period.split('-');
-  
+
   // start = 26th of previous month
   const startDate = new Date(year, parseInt(month) - 2, 26);
   startDate.setHours(0, 0, 0, 0);
@@ -29,8 +38,11 @@ async function getCoachCommission(coachId, period, company) {
   const lessons = await LessonRecord.find({
     coach: coachId,
     lessonDate: { $gte: startDate, $lte: endDate },
-    status: 'completed',
-  }).populate('studentCourse', 'commissionPerLesson perLessonRate commissionRate studentName company');
+    status: { $in: ['completed', 'no_show'] },
+  }).populate(
+    'studentCourse',
+    'commissionPerLesson perLessonRate commissionRate studentName company',
+  );
 
   let total = 0;
   for (const lesson of lessons) {
@@ -38,10 +50,13 @@ async function getCoachCommission(coachId, period, company) {
       // กรอง commission เฉพาะบริษัทที่ระบุ
       const courseCompany = lesson.studentCourse.company || '';
       if (company && courseCompany !== company) continue;
-      
-      const lessonRate = lesson.commissionRate != null ? lesson.commissionRate : (lesson.studentCourse.commissionRate || 0);
+
+      const lessonRate =
+        lesson.commissionRate != null
+          ? lesson.commissionRate
+          : lesson.studentCourse.commissionRate || 0;
       const perLessonRate = lesson.studentCourse.perLessonRate || 0;
-      total += Math.round((perLessonRate * lessonRate / 100) * 100) / 100;
+      total += Math.round(((perLessonRate * lessonRate) / 100) * 100) / 100;
     }
   }
   return Math.round(total * 100) / 100;
@@ -51,15 +66,16 @@ async function getCoachCommission(coachId, period, company) {
 router.get('/', async (req, res) => {
   try {
     const { period } = req.query;
-    if (!period) return res.status(400).json({ error: 'กรุณาระบุงวดเงินเดือน (period)' });
+    if (!period)
+      return res.status(400).json({ error: 'กรุณาระบุงวดเงินเดือน (period)' });
 
     const records = await PayrollRecord.find({ period })
       .populate({
         path: 'employee',
-        populate: { path: 'branch', select: 'name code type' }
+        populate: { path: 'branch', select: 'name code type' },
       })
       .sort('employee.employeeId');
-    
+
     res.json(records);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -70,40 +86,63 @@ router.get('/', async (req, res) => {
 router.post('/calculate', async (req, res) => {
   try {
     const { period } = req.body;
-    if (!period) return res.status(400).json({ error: 'กรุณาระบุงวดเงินเดือน (period)' });
+    if (!period)
+      return res.status(400).json({ error: 'กรุณาระบุงวดเงินเดือน (period)' });
 
     const [year, month] = period.split('-');
     const monthIndex = parseInt(month) - 1;
     const periodLabel = `${THAI_MONTHS[monthIndex]} ${year}`;
 
-    const employees = await Employee.find({ status: { $in: ['active', 'probation'] } });
-    
+    const employees = await Employee.find({
+      status: { $in: ['active', 'probation'] },
+    });
+
     const results = [];
 
     for (const emp of employees) {
       // กำหนดรายชื่อบริษัทที่พนักงานอยู่
-      const companyList = emp.companies && emp.companies.length > 0
-        ? emp.companies
-        : [{ company: 'บุญรอดกอล์ฟพัฒนา', employmentType: emp.employmentType || 'fulltime' }];
+      const companyList =
+        emp.companies && emp.companies.length > 0
+          ? emp.companies
+          : [
+              {
+                company: 'บุญรอดกอล์ฟพัฒนา',
+                employmentType: emp.employmentType || 'fulltime',
+              },
+            ];
 
-      // track ว่าจ่าย baseSalary ไปหรือยัง (จ่ายเฉพาะบริษัทแรก)
-      let baseSalaryPaid = false;
+      const fulltimeCompanies = companyList
+        .filter((item) => (item.employmentType || 'fulltime') === 'fulltime')
+        .map((item) => item.company);
+      const preferredPayrollCompany = emp.payrollCompany;
+      const salaryCompany = fulltimeCompanies.includes(preferredPayrollCompany)
+        ? preferredPayrollCompany
+        : fulltimeCompanies[0] || companyList[0]?.company;
 
       for (const companyInfo of companyList) {
         const companyName = companyInfo.company;
         const compEmpType = companyInfo.employmentType || 'fulltime';
 
-        let existing = await PayrollRecord.findOne({ 
-          employee: emp._id, period, company: companyName 
+        let existing = await PayrollRecord.findOne({
+          employee: emp._id,
+          period,
+          company: companyName,
         });
         const existingOtherDeductions = existing ? existing.otherDeductions : 0;
         const existingSalesBonus = existing ? existing.salesBonus : 0;
 
         // คำนวณค่าคอมจาก lesson records เฉพาะบริษัทนี้
-        const commissionAmount = await getCoachCommission(emp._id, period, companyName);
-        
-        // เงินเดือนฐานจ่ายเฉพาะบริษัทแรกที่เป็นประจำ (หรือบริษัทแรก)
-        const shouldPayBase = !baseSalaryPaid && (compEmpType === 'fulltime' || companyList.length === 1);
+        const commissionAmount = await getCoachCommission(
+          emp._id,
+          period,
+          companyName,
+        );
+
+        const shouldPayBase = companyName === salaryCompany;
+        const hasCompanyBaseSalary =
+          companyInfo.baseSalary !== undefined &&
+          companyInfo.baseSalary !== null;
+        const companyBaseSalary = Number(companyInfo.baseSalary) || 0;
 
         // คำนวณค่าแนะนำลูกค้า Test (100 บาท/คน) - เฉพาะบริษัทแรก
         let referralBonus = 0;
@@ -122,36 +161,48 @@ router.post('/calculate', async (req, res) => {
           });
           referralBonus = referralCount * 100;
         }
-        
+
         // สร้าง employee object จำลองเพื่อส่งเข้า calculator
         const empForCalc = {
           ...emp.toObject(),
           employmentType: compEmpType,
           // ถ้าไม่จ่าย baseSalary จากบริษัทนี้ ให้ set = 0
-          baseSalary: shouldPayBase ? emp.baseSalary : 0,
+          baseSalary: hasCompanyBaseSalary
+            ? companyBaseSalary
+            : shouldPayBase
+              ? emp.baseSalary
+              : 0,
           livingAllowance: shouldPayBase ? emp.livingAllowance : 0,
           positionAllowance: shouldPayBase ? emp.positionAllowance : 0,
           professionalAllowance: shouldPayBase ? emp.professionalAllowance : 0,
         };
 
-        if (shouldPayBase) baseSalaryPaid = true;
-
         // คำนวณ payroll (รวมค่าคอม + sale + ค่าแนะนำ)
-        const calc = calculatePayroll(empForCalc, existingOtherDeductions, commissionAmount, existingSalesBonus, referralBonus, period);
+        const calc = calculatePayroll(
+          empForCalc,
+          existingOtherDeductions,
+          commissionAmount,
+          existingSalesBonus,
+          referralBonus,
+          period,
+        );
 
         if (existing) {
-          Object.assign(existing, calc, { 
-            period, periodLabel, company: companyName,
+          Object.assign(existing, calc, {
+            period,
+            periodLabel,
+            company: companyName,
             referralCount,
             status: 'calculated',
-            calculatedAt: new Date()
+            calculatedAt: new Date(),
           });
           await existing.save();
           results.push(existing);
         } else {
           const record = new PayrollRecord({
             employee: emp._id,
-            period, periodLabel,
+            period,
+            periodLabel,
             company: companyName,
             referralCount,
             ...calc,
@@ -164,11 +215,10 @@ router.post('/calculate', async (req, res) => {
       }
     }
 
-    const populated = await PayrollRecord.find({ period })
-      .populate({
-        path: 'employee',
-        populate: { path: 'branch', select: 'name code type' }
-      });
+    const populated = await PayrollRecord.find({ period }).populate({
+      path: 'employee',
+      populate: { path: 'branch', select: 'name code type' },
+    });
 
     res.json({
       message: `คำนวณเงินเดือนงวด ${periodLabel} เรียบร้อย (${results.length} รายการ)`,
@@ -190,16 +240,22 @@ router.put('/:id/deductions', async (req, res) => {
 
     const employee = await Employee.findById(record.employee);
     // Recalculate everything to update net pay accurately (and also SSO cap if year matters)
-    const calc = calculatePayroll(employee, record.otherDeductions, record.commissionAmount, record.salesBonus || 0, record.referralBonus || 0, record.period);
+    const calc = calculatePayroll(
+      employee,
+      record.otherDeductions,
+      record.commissionAmount,
+      record.salesBonus || 0,
+      record.referralBonus || 0,
+      record.period,
+    );
     Object.assign(record, calc);
     record.calculatedAt = new Date();
     await record.save();
 
-    const populated = await PayrollRecord.findById(record._id)
-      .populate({
-        path: 'employee',
-        populate: { path: 'branch', select: 'name code type' }
-      });
+    const populated = await PayrollRecord.findById(record._id).populate({
+      path: 'employee',
+      populate: { path: 'branch', select: 'name code type' },
+    });
 
     res.json(populated);
   } catch (err) {
@@ -218,16 +274,22 @@ router.put('/:id/sales-bonus', async (req, res) => {
     if (!employee) return res.status(404).json({ error: 'ไม่พบข้อมูลพนักงาน' });
 
     // Recalculate with updated sales bonus (preserve existing referralBonus and period)
-    const calc = calculatePayroll(employee, record.otherDeductions, record.commissionAmount, salesBonus || 0, record.referralBonus || 0, record.period);
+    const calc = calculatePayroll(
+      employee,
+      record.otherDeductions,
+      record.commissionAmount,
+      salesBonus || 0,
+      record.referralBonus || 0,
+      record.period,
+    );
     Object.assign(record, calc);
     record.calculatedAt = new Date();
     await record.save();
 
-    const populated = await PayrollRecord.findById(record._id)
-      .populate({
-        path: 'employee',
-        populate: { path: 'branch', select: 'name code type' }
-      });
+    const populated = await PayrollRecord.findById(record._id).populate({
+      path: 'employee',
+      populate: { path: 'branch', select: 'name code type' },
+    });
 
     res.json(populated);
   } catch (err) {
@@ -239,7 +301,8 @@ router.put('/:id/sales-bonus', async (req, res) => {
 router.get('/commission-summary', async (req, res) => {
   try {
     const { period } = req.query;
-    if (!period) return res.status(400).json({ error: 'กรุณาระบุ period (YYYY-MM)' });
+    if (!period)
+      return res.status(400).json({ error: 'กรุณาระบุ period (YYYY-MM)' });
 
     let startDate, endDate;
     const isUncounted = period.endsWith('-uncounted');
@@ -271,7 +334,9 @@ router.get('/commission-summary', async (req, res) => {
     }
 
     const coaches = await Employee.find(query)
-      .select('employeeId firstNameTh lastNameTh nickname department position branch')
+      .select(
+        'employeeId firstNameTh lastNameTh nickname department position branch',
+      )
       .populate('branch', 'name code');
 
     const result = [];
@@ -280,16 +345,24 @@ router.get('/commission-summary', async (req, res) => {
       const lessons = await LessonRecord.find({
         coach: coach._id,
         lessonDate: { $gte: startDate, $lte: endDate },
-        status: 'completed',
-      }).populate('studentCourse', 'commissionPerLesson perLessonRate commissionRate studentName company totalLessons')
+        status: { $in: ['completed', 'no_show'] },
+      })
+        .populate(
+          'studentCourse',
+          'commissionPerLesson perLessonRate commissionRate studentName company totalLessons',
+        )
         .populate('branch', 'name code');
 
       let totalCommission = 0;
       for (const lesson of lessons) {
         if (lesson.studentCourse) {
-          const lessonRate = lesson.commissionRate != null ? lesson.commissionRate : (lesson.studentCourse.commissionRate || 0);
+          const lessonRate =
+            lesson.commissionRate != null
+              ? lesson.commissionRate
+              : lesson.studentCourse.commissionRate || 0;
           const perLessonRate = lesson.studentCourse.perLessonRate || 0;
-          totalCommission += Math.round((perLessonRate * lessonRate / 100) * 100) / 100;
+          totalCommission +=
+            Math.round(((perLessonRate * lessonRate) / 100) * 100) / 100;
         }
       }
 
@@ -312,7 +385,7 @@ router.get('/commission-summary', async (req, res) => {
         totalCoaches: result.length,
         totalLessons,
         grandTotal: Math.round(grandTotal * 100) / 100,
-      }
+      },
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -337,11 +410,12 @@ router.get('/commission-details', async (req, res) => {
     const lessons = await LessonRecord.find({
       coach: coachId,
       lessonDate: { $gte: startDate, $lte: endDate },
-      status: 'completed',
+      status: { $in: ['completed', 'no_show'] },
     })
       .populate({
         path: 'studentCourse',
-        select: 'studentName packagePrice totalLessons commissionPerLesson commissionRate perLessonRate company',
+        select:
+          'studentName packagePrice totalLessons commissionPerLesson commissionRate perLessonRate company',
       })
       .populate('branch', 'name code')
       .sort('lessonDate');
@@ -356,15 +430,17 @@ router.get('/commission-details', async (req, res) => {
 router.get('/periods', async (req, res) => {
   try {
     const periods = await PayrollRecord.distinct('period');
-    const periodList = periods.map(p => {
-      const [year, month] = p.split('-');
-      const monthIndex = parseInt(month) - 1;
-      return {
-        value: p,
-        label: `${THAI_MONTHS[monthIndex]} ${year}`,
-      };
-    }).sort((a, b) => b.value.localeCompare(a.value));
-    
+    const periodList = periods
+      .map((p) => {
+        const [year, month] = p.split('-');
+        const monthIndex = parseInt(month) - 1;
+        return {
+          value: p,
+          label: `${THAI_MONTHS[monthIndex]} ${year}`,
+        };
+      })
+      .sort((a, b) => b.value.localeCompare(a.value));
+
     res.json(periodList);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -378,14 +454,18 @@ router.get('/my-payslip', async (req, res) => {
       return res.status(400).json({ error: 'กรุณาระบุ employeeId และ period' });
     }
 
-    const records = await PayrollRecord.find({ employee: employeeId, period })
-      .populate({
-        path: 'employee',
-        populate: { path: 'branch', select: 'name code type' }
-      });
+    const records = await PayrollRecord.find({
+      employee: employeeId,
+      period,
+    }).populate({
+      path: 'employee',
+      populate: { path: 'branch', select: 'name code type' },
+    });
 
-    const employee = await Employee.findById(employeeId)
-      .populate('branch', 'name code type');
+    const employee = await Employee.findById(employeeId).populate(
+      'branch',
+      'name code type',
+    );
 
     res.json({ records, employee });
   } catch (err) {

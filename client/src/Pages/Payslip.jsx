@@ -164,6 +164,22 @@ const PayslipDetail = ({ record, employee }) => {
               {isParttime ? "Part-time" : "ประจำ"}
             </Text>
           </Box>
+          <Box>
+            <Text fontSize="xs" color="gray.500" fontWeight="semibold">
+              ธนาคาร
+            </Text>
+            <Text fontSize="sm" fontWeight="bold" color="gray.800">
+              {employee?.bankName || "-"}
+            </Text>
+          </Box>
+          <Box>
+            <Text fontSize="xs" color="gray.500" fontWeight="semibold">
+              เลขบัญชี
+            </Text>
+            <Text fontSize="sm" fontWeight="bold" color="gray.800">
+              {employee?.bankAccount || "-"}
+            </Text>
+          </Box>
         </SimpleGrid>
       </Box>
 
@@ -453,7 +469,7 @@ const Payslip = () => {
     }
 
     // Check if the input exactly matches the employee's ID card
-    if (pinInput === employee.idCard) {
+    if (pinInput?.trim() === employee.idCard?.trim()) {
       setIsUnlocked(true);
       setPinError("");
     } else {

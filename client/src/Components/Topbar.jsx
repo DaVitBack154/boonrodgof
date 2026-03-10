@@ -1,6 +1,12 @@
 import { Flex, Text, Box, Badge } from "@chakra-ui/react";
 import { Button, Dropdown, Avatar as AntAvatar } from "antd";
-import { Bell, Menu as MenuIcon, LogOut, User as UserIcon } from "lucide-react";
+import {
+  Bell,
+  Menu as MenuIcon,
+  LogOut,
+  User as UserIcon,
+  ChevronDown,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 
@@ -152,6 +158,9 @@ const Topbar = ({ onOpenSidebar }) => {
               <Text fontSize="xs" color="gray.500">
                 {user?.email || ""}
               </Text>
+            </Box>
+            <Box ml="2" color="gray.500" display="flex" alignItems="center">
+              <ChevronDown size={16} />
             </Box>
           </Flex>
         </Dropdown>

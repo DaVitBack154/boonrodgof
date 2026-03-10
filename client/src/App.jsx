@@ -11,6 +11,7 @@ import MonthlyCommission from "./Pages/MonthlyCommission";
 import Payslip from "./Pages/Payslip";
 import StudentCourses from "./Pages/StudentCourses";
 import Login from "./Pages/Login";
+import PaySocialSecurity from "./Pages/pay_social_security";
 import { Box, Heading, Text } from "@chakra-ui/react";
 
 const Placeholder = ({ title }) => (
@@ -36,6 +37,7 @@ function App() {
         <Route path="leave" element={<Leave />} />
         <Route path="monthly-commission" element={<MonthlyCommission />} />
         <Route path="payroll" element={<Payroll />} />
+        <Route path="pay-social-security" element={<PaySocialSecurity />} />
         <Route path="payslip" element={<Payslip />} />
         <Route path="student-courses" element={<StudentCourses />} />
         <Route path="settings" element={<Placeholder title="ตั้งค่าระบบ" />} />
