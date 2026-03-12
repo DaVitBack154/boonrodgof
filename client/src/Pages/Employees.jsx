@@ -44,6 +44,7 @@ import {
   Wrap,
   WrapItem,
 } from '@chakra-ui/react';
+import { DatePicker } from 'antd';
 import {
   Search,
   Plus,
@@ -55,6 +56,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
+import dayjs from 'dayjs';
 import {
   getEmployees,
   getBranches,
@@ -518,14 +520,17 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                     วันเกิด
                   </FormLabel>
                   <Input
-                    bg="gray.50"
-                    border="none"
-                    type="date"
-                    borderRadius="lg"
-                    value={
-                      form.birthDate ? form.birthDate.substring(0, 10) : ''
+                    as={DatePicker}
+                    style={{ width: '100%' }}
+                    value={form.birthDate ? dayjs(form.birthDate) : null}
+                    format="DD/MM/YYYY"
+                    placeholder="เลือกวันเกิด"
+                    onChange={(date) =>
+                      handleChange(
+                        'birthDate',
+                        date ? date.format('YYYY-MM-DD') : '',
+                      )
                     }
-                    onChange={(e) => handleChange('birthDate', e.target.value)}
                   />
                 </FormControl>
                 <FormControl>
@@ -646,14 +651,17 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                     วันที่เริ่มงาน
                   </FormLabel>
                   <Input
-                    bg="gray.50"
-                    border="none"
-                    type="date"
-                    borderRadius="lg"
-                    value={
-                      form.startDate ? form.startDate.substring(0, 10) : ''
+                    as={DatePicker}
+                    style={{ width: '100%' }}
+                    value={form.startDate ? dayjs(form.startDate) : null}
+                    format="DD/MM/YYYY"
+                    placeholder="เลือกวันที่เริ่มงาน"
+                    onChange={(date) =>
+                      handleChange(
+                        'startDate',
+                        date ? date.format('YYYY-MM-DD') : '',
+                      )
                     }
-                    onChange={(e) => handleChange('startDate', e.target.value)}
                   />
                 </FormControl>
                 <FormControl>
@@ -1015,10 +1023,8 @@ const EmployeeDetailView = ({ employee, branches, onBack, onSave, isNew }) => {
                     onChange={(e) => handleChange('bankName', e.target.value)}
                   >
                     <option value="">-- เลือกธนาคาร --</option>
-                    <option value="ธนาคารกสิกรไทย">ธนาคารกสิกรไทย</option>
-                    <option value="ธนาคารไทยพาณิชย์">ธนาคารไทยพาณิชย์</option>
-                    <option value="ธนาคารกรุงเทพ">ธนาคารกรุงเทพ</option>
-                    <option value="ธนาคารกรุงไทย">ธนาคารกรุงไทย</option>
+                    <option value="ธนาคารกรุงศรีอยุธยา">ธนาคารกรุงศรีอยุธยา</option>
+                    <option value="พร้อมเพย์">พร้อมเพย์</option>
                   </Select>
                 </FormControl>
                 <FormControl>

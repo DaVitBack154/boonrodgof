@@ -1,6 +1,54 @@
 const express = require('express');
 const router = express.Router();
 const Employee = require('../models/Employee');
+const User = require('../models/User');
+
+// GET /api/employees/coaches - ดึงรายชื่อโค้ช (ที่มี Role เป็น coach ใน User)
+router.get('/coaches', async (req, res) => {
+  try {
+    const skip = parseInt(req.query.skip) || 0;
+    const limit = parseInt(req.query.limit) || 0; // 0 means no limit
+    
+    // ค้นหา User ที่เป็น coach
+    const coachUsers = await User.find({ role: 'coach' })
+      .populate({
+        path: 'employee',
+        populate: { path: 'branch', select: 'name code type' }
+      });
+      
+    // ดึงเฉพาะคนที่มี employee data
+    let coaches = coachUsers
+      .filter(u => u.employee)
+      .map(u => ({
+        ...u.employee.toObject(),
+        role: u.role // เผื่อเอาไปใช้หน้า frontend
+      }));
+      
+    // Apply filters from query if needed (e.g., branch)
+    if (req.query.branch) {
+      coaches = coaches.filter(c => {
+        if (!c.branch) return false;
+        const branchIds = Array.isArray(c.branch) 
+          ? c.branch.map(b => b._id.toString()) 
+          : [c.branch._id.toString()];
+        return branchIds.includes(req.query.branch);
+      });
+    }
+    if (req.query.status) {
+      coaches = coaches.filter(c => c.status === req.query.status);
+    }
+    
+    // Sort and limit
+    coaches.sort((a, b) => a.employeeId.localeCompare(b.employeeId));
+    if (limit > 0) {
+        coaches = coaches.slice(skip, skip + limit);
+    }
+    
+    res.json(coaches);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // GET /api/employees - ดึงรายชื่อพนักงาน (พร้อม filter)
 router.get('/', async (req, res) => {

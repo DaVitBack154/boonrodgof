@@ -323,21 +323,21 @@ router.get('/commission-summary', async (req, res) => {
       endDate.setHours(23, 59, 59, 999);
     }
 
-    // ดึงโค้ชทั้งหมด (หรือเฉพาะ coachId ที่ส่งมา)
+    // ดึงโค้ชทั้งหมด (หรือเฉพาะ coachId ที่ส่งมา) จาก User model
     const { coachId } = req.query;
-    const query = {
-      department: { $in: ['ผู้ฝึกสอน', 'ผู้ช่วยฝึกสอน'] },
-      status: { $in: ['active', 'probation'] },
-    };
-    if (coachId) {
-      query._id = coachId;
-    }
+    const User = require('../models/User');
+    const coachUsers = await User.find({ role: 'coach' }).populate({
+      path: 'employee',
+      populate: { path: 'branch', select: 'name code' },
+    });
 
-    const coaches = await Employee.find(query)
-      .select(
-        'employeeId firstNameTh lastNameTh nickname department position branch',
-      )
-      .populate('branch', 'name code');
+    let coaches = coachUsers
+      .filter(u => u.employee && ['active', 'probation'].includes(u.employee.status))
+      .map(u => u.employee);
+
+    if (coachId) {
+      coaches = coaches.filter(c => c._id.toString() === coachId);
+    }
 
     const result = [];
 

@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const LessonRecord = require('../models/LessonRecord');
 const StudentCourse = require('../models/StudentCourse');
+const User = require('../models/User');
+const Employee = require('../models/Employee');
 
 // GET /api/schedule?month=2026-02
 router.get('/', async (req, res) => {
@@ -14,16 +16,17 @@ router.get('/', async (req, res) => {
     const endDate = new Date(yyyy, parseInt(mm), 0, 23, 59, 59);
 
     // ถ้าเลือกสาขา ให้กรองโค้ชตามสาขาก่อน
-    const Employee = require('../models/Employee');
     let coachFilter = {};
     if (branch) {
-      const branchCoaches = await Employee.find({
-        branch: { $in: [branch] },
-        department: { $in: ['ผู้ฝึกสอน', 'ผู้ช่วยฝึกสอน'] },
-        status: 'active',
-      }).select('_id');
-      const coachIds = branchCoaches.map(c => c._id);
-      coachFilter = { coach: { $in: coachIds } };
+      const coachUsers = await User.find({ role: 'coach' }).populate('employee');
+      const branchCoachIds = coachUsers
+        .filter(u => u.employee && u.employee.status === 'active')
+        .filter(u => {
+          const branches = Array.isArray(u.employee.branch) ? u.employee.branch.map(b => b.toString()) : [];
+          return branches.includes(branch);
+        })
+        .map(u => u.employee._id);
+      coachFilter = { coach: { $in: branchCoachIds } };
     }
 
     // ดึงข้อมูล lesson ทั้งหมดในเดือน
@@ -90,17 +93,23 @@ router.get('/daily', async (req, res) => {
     const dayStart = new Date(date + 'T00:00:00');
     const dayEnd = new Date(date + 'T23:59:59');
 
-    // Get coaches (filter by branch if specified)
-    const Employee = require('../models/Employee');
-    const coachFilter = {
-      department: { $in: ['ผู้ฝึกสอน', 'ผู้ช่วยฝึกสอน'] },
-      status: 'active',
-    };
-    if (branch) coachFilter.branch = { $in: [branch] };
+    // Get coaches from User model (role: 'coach')
+    const coachUsers = await User.find({ role: 'coach' }).populate({
+      path: 'employee',
+      populate: { path: 'branch', select: 'name' }
+    });
 
-    const allCoaches = await Employee.find(coachFilter)
-      .select('employeeId firstNameTh lastNameTh nickname department branch')
-      .populate('branch', 'name');
+    let allCoaches = coachUsers
+      .filter(u => u.employee && u.employee.status === 'active')
+      .map(u => u.employee);
+
+    // Filter by branch if specified
+    if (branch) {
+      allCoaches = allCoaches.filter(c => {
+        const branchIds = Array.isArray(c.branch) ? c.branch.map(b => (b._id || b).toString()) : [];
+        return branchIds.includes(branch);
+      });
+    }
 
     // Filter lessons by these coaches
     const coachIds = allCoaches.map(c => c._id);
@@ -132,16 +141,21 @@ router.get('/range', async (req, res) => {
     const start = new Date(startDate + 'T00:00:00');
     const end = new Date(endDate + 'T23:59:59');
 
-    const Employee = require('../models/Employee');
-    const coachFilter = {
-      department: { $in: ['ผู้ฝึกสอน', 'ผู้ช่วยฝึกสอน'] },
-      status: 'active',
-    };
-    if (branch) coachFilter.branch = { $in: [branch] };
+    const coachUsersRange = await User.find({ role: 'coach' }).populate({
+      path: 'employee',
+      populate: { path: 'branch', select: 'name' }
+    });
 
-    const allCoaches = await Employee.find(coachFilter)
-      .select('employeeId firstNameTh lastNameTh nickname department branch')
-      .populate('branch', 'name');
+    let allCoaches = coachUsersRange
+      .filter(u => u.employee && u.employee.status === 'active')
+      .map(u => u.employee);
+
+    if (branch) {
+      allCoaches = allCoaches.filter(c => {
+        const branchIds = Array.isArray(c.branch) ? c.branch.map(b => (b._id || b).toString()) : [];
+        return branchIds.includes(branch);
+      });
+    }
 
     const coachIds = allCoaches.map(c => c._id);
     const lessons = await LessonRecord.find({
@@ -166,11 +180,13 @@ router.get('/range', async (req, res) => {
 // GET /api/schedule/coaches - get unique coaches
 router.get('/coaches', async (req, res) => {
   try {
-    const Employee = require('../models/Employee');
-    const coaches = await Employee.find({
-      department: { $in: ['ผู้ฝึกสอน', 'ผู้ช่วยฝึกสอน'] },
-      status: 'active',
-    }).select('employeeId firstNameTh lastNameTh nickname department');
+    const coachUsers = await User.find({ role: 'coach' }).populate({
+      path: 'employee',
+      select: 'employeeId firstNameTh lastNameTh nickname department',
+    });
+    const coaches = coachUsers
+      .filter(u => u.employee && u.employee.status !== 'resigned')
+      .map(u => u.employee);
     res.json(coaches);
   } catch (err) {
     res.status(500).json({ error: err.message });

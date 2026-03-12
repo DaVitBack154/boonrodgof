@@ -35,6 +35,7 @@ export const createBranch = (data) => api.post('/branches', data).then(r => r.da
 
 // ===== Employees =====
 export const getEmployees = (params = {}) => api.get('/employees', { params }).then(r => r.data);
+export const getCoaches = () => api.get('/employees/coaches').then(r => r.data);
 export const getEmployee = (id) => api.get(`/employees/${id}`).then(r => r.data);
 export const createEmployee = (data) => api.post('/employees', data).then(r => r.data);
 export const updateEmployee = (id, data) => api.put(`/employees/${id}`, data).then(r => r.data);

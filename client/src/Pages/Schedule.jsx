@@ -28,10 +28,10 @@ import {
   PopoverHeader,
   PopoverBody,
   IconButton,
-} from "@chakra-ui/react";
-import { Modal, Form, Select as AntSelect, DatePicker, message } from "antd";
-import Spinload from "../Components/spinload";
-import dayjs from "dayjs";
+} from '@chakra-ui/react';
+import { Modal, Form, Select as AntSelect, DatePicker, message } from 'antd';
+import Spinload from '../Components/spinload';
+import dayjs from 'dayjs';
 import {
   Calendar,
   ChevronLeft,
@@ -41,9 +41,9 @@ import {
   XCircle,
   AlertCircle,
   UserPlus,
-} from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
-import useSWR from "swr";
+} from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import useSWR from 'swr';
 import {
   getSchedule,
   getDailySchedule,
@@ -53,79 +53,80 @@ import {
   createStudentCourse,
   createTestLesson,
   getEmployees,
+  getCoaches,
   getBranches,
-} from "../services/api";
-import { IoIosAddCircle } from "react-icons/io";
-import { IoMdPie } from "react-icons/io";
+} from '../services/api';
+import { IoIosAddCircle } from 'react-icons/io';
+import { IoMdPie } from 'react-icons/io';
 
 const THAI_MONTHS = [
-  "มกราคม",
-  "กุมภาพันธ์",
-  "มีนาคม",
-  "เมษายน",
-  "พฤษภาคม",
-  "มิถุนายน",
-  "กรกฎาคม",
-  "สิงหาคม",
-  "กันยายน",
-  "ตุลาคม",
-  "พฤศจิกายน",
-  "ธันวาคม",
+  'มกราคม',
+  'กุมภาพันธ์',
+  'มีนาคม',
+  'เมษายน',
+  'พฤษภาคม',
+  'มิถุนายน',
+  'กรกฎาคม',
+  'สิงหาคม',
+  'กันยายน',
+  'ตุลาคม',
+  'พฤศจิกายน',
+  'ธันวาคม',
 ];
 
 const THAI_DAYS = [
-  "อาทิตย์",
-  "จันทร์",
-  "อังคาร",
-  "พุธ",
-  "พฤหัสบดี",
-  "ศุกร์",
-  "เสาร์",
+  'อาทิตย์',
+  'จันทร์',
+  'อังคาร',
+  'พุธ',
+  'พฤหัสบดี',
+  'ศุกร์',
+  'เสาร์',
 ];
-const SHORT_DAYS = ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."];
+const SHORT_DAYS = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
 
 const TIME_SLOTS = [
-  "08:00",
-  "09:00",
-  "10:00",
-  "11:00",
-  "12:00",
-  "13:00",
-  "14:00",
-  "15:00",
-  "16:00",
-  "17:00",
-  "18:00",
-  "19:00",
-  "20:00",
+  '08:00',
+  '09:00',
+  '10:00',
+  '11:00',
+  '12:00',
+  '13:00',
+  '14:00',
+  '15:00',
+  '16:00',
+  '17:00',
+  '18:00',
+  '19:00',
+  '20:00',
 ];
 
 // สี background สำหรับแต่ละโค้ช (วนรอบ)
 const COACH_COLORS = [
-  { bg: "#FFF3E0", border: "#FF9800", text: "#E65100" },
-  { bg: "#E8F5E9", border: "#4CAF50", text: "#1B5E20" },
-  { bg: "#E3F2FD", border: "#2196F3", text: "#0D47A1" },
-  { bg: "#FCE4EC", border: "#E91E63", text: "#880E4F" },
-  { bg: "#F3E5F5", border: "#9C27B0", text: "#4A148C" },
-  { bg: "#FFF8E1", border: "#FFC107", text: "#F57F17" },
-  { bg: "#E0F7FA", border: "#00BCD4", text: "#006064" },
-  { bg: "#EFEBE9", border: "#795548", text: "#3E2723" },
+  { bg: '#FFF3E0', border: '#FF9800', text: '#E65100' },
+  { bg: '#E8F5E9', border: '#4CAF50', text: '#1B5E20' },
+  { bg: '#E3F2FD', border: '#2196F3', text: '#0D47A1' },
+  { bg: '#FCE4EC', border: '#E91E63', text: '#880E4F' },
+  { bg: '#F3E5F5', border: '#9C27B0', text: '#4A148C' },
+  { bg: '#FFF8E1', border: '#FFC107', text: '#F57F17' },
+  { bg: '#E0F7FA', border: '#00BCD4', text: '#006064' },
+  { bg: '#EFEBE9', border: '#795548', text: '#3E2723' },
 ];
 
 const STATUS_COLORS = {
-  active: { bg: "orange.50", color: "orange.600", label: "รอคอนเฟิร์ม" },
-  booked: { bg: "blue.50", color: "blue.600", label: "จองคลาส" },
-  completed: { bg: "green.50", color: "green.700", label: "มาเรียนแล้ว" },
-  no_show: { bg: "red.50", color: "red.600", label: "ไม่มาเรียน (หักชั่วโมง)" },
-  cancelled: { bg: "gray.100", color: "gray.500", label: "ยกเลิกคลาส" },
-  test: { bg: "purple.50", color: "purple.600", label: "ทดลองเรียน" },
+  active: { bg: 'orange.50', color: 'orange.600', label: 'รอคอนเฟิร์ม' },
+  booked: { bg: 'blue.50', color: 'blue.600', label: 'จองคลาส' },
+  completed: { bg: 'green.50', color: 'green.700', label: 'มาเรียนแล้ว' },
+  no_show: { bg: 'red.50', color: 'red.600', label: 'ไม่มาเรียน (หักชั่วโมง)' },
+  cancelled: { bg: 'gray.100', color: 'gray.500', label: 'ยกเลิกคลาส' },
+  test: { bg: 'purple.50', color: 'purple.600', label: 'ทดลองเรียน' },
 };
 
 // Helper: format date as YYYY-MM-DD
 const fmtDate = (d) => {
   const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${dd}`;
 };
 
@@ -137,20 +138,20 @@ const fmtThaiDate = (d) => {
 const Schedule = () => {
   const today = new Date();
   const [selectedDate, setSelectedDate] = useState(fmtDate(today));
-  const [viewMode, setViewMode] = useState("daily"); // "daily" | "monthly"
+  const [viewMode, setViewMode] = useState('daily'); // "daily" | "monthly"
   const [branches, setBranches] = useState([]);
-  const [selectedBranch, setSelectedBranch] = useState("");
+  const [selectedBranch, setSelectedBranch] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  const dateObj = new Date(selectedDate + "T00:00:00");
-  const monthStr = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, "0")}`;
+  const dateObj = new Date(selectedDate + 'T00:00:00');
+  const monthStr = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
 
   const fetcher = async ([_, vMode, sDate, sBranch]) => {
-    if (vMode === "daily") {
+    if (vMode === 'daily') {
       return await getDailySchedule(sDate, sBranch || undefined);
     } else {
-      const d = new Date(sDate + "T00:00:00");
-      const mStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const d = new Date(sDate + 'T00:00:00');
+      const mStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       return await getSchedule(mStr, sBranch || undefined);
     }
   };
@@ -160,17 +161,17 @@ const Schedule = () => {
     mutate: mutateSchedule,
     isLoading: loading,
   } = useSWR(
-    ["schedule", viewMode, selectedDate, selectedBranch],
+    ['schedule', viewMode, selectedDate, selectedBranch],
     fetcher,
     { refreshInterval: 5000 }, // Polling every 5 seconds for real-time updates
   );
 
   const dailyData =
-    viewMode === "daily"
+    viewMode === 'daily'
       ? scheduleData || { lessons: [], coaches: [] }
       : { lessons: [], coaches: [] };
   const monthlyData =
-    viewMode === "monthly"
+    viewMode === 'monthly'
       ? scheduleData || { lessons: [], summary: { coachStats: [] } }
       : { lessons: [], summary: { coachStats: [] } };
 
@@ -183,6 +184,7 @@ const Schedule = () => {
   const [customerType, setCustomerType] = useState(null); // null | "test" | "existing" | "new"
   const [activeCourses, setActiveCourses] = useState([]);
   const [allEmployees, setAllEmployees] = useState([]);
+  const [coachesList, setCoachesList] = useState([]);
   const [form] = Form.useForm();
 
   // Edit Lesson Modal State
@@ -194,12 +196,12 @@ const Schedule = () => {
 
   const loadActiveCourses = async () => {
     try {
-      const params = { status: "active" };
+      const params = { status: 'active' };
       if (selectedBranch) params.branch = selectedBranch;
       const courses = await getStudentCourses(params);
       setActiveCourses(courses || []);
     } catch (error) {
-      console.error("Failed to load active courses", error);
+      console.error('Failed to load active courses', error);
     }
   };
 
@@ -207,8 +209,10 @@ const Schedule = () => {
     try {
       const emps = await getEmployees();
       setAllEmployees(emps || []);
+      const coaches = await getCoaches();
+      setCoachesList(coaches || []);
     } catch (error) {
-      console.error("Failed to load employees", error);
+      console.error('Failed to load employees/coaches', error);
     }
   };
 
@@ -216,7 +220,7 @@ const Schedule = () => {
     setCustomerType(null);
     form.resetFields();
     form.setFieldsValue({
-      status: "active",
+      status: 'active',
       branchId: selectedBranch || undefined,
     });
     loadActiveCourses();
@@ -231,8 +235,8 @@ const Schedule = () => {
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
       // === Test Mode: สร้าง test lesson โดยไม่ต้องมี course ===
-      if (customerType === "test") {
-        const formattedDate = values.date.format("YYYY-MM-DD");
+      if (customerType === 'test') {
+        const formattedDate = values.date.format('YYYY-MM-DD');
         const lessonDate = new Date(`${formattedDate}T${values.time}:00`);
 
         const payload = {
@@ -241,13 +245,13 @@ const Schedule = () => {
           lessonDate,
           referredBy: values.referredBy || undefined,
           branch: values.branchId || selectedBranch || undefined,
-          company: values.company || "",
+          company: values.company || '',
         };
 
         await createTestLesson(payload);
         toast({
-          title: "บันทึกลูกค้าทดลองสำเร็จ",
-          status: "success",
+          title: 'บันทึกลูกค้าทดลองสำเร็จ',
+          status: 'success',
           duration: 3000,
           isClosable: true,
         });
@@ -258,17 +262,17 @@ const Schedule = () => {
       }
 
       // === Existing or New Customer ===
-      const formattedDate = values.date.format("YYYY-MM-DD");
+      const formattedDate = values.date.format('YYYY-MM-DD');
       const lessonDate = new Date(`${formattedDate}T${values.time}:00`);
 
       const payload = {
         lessonDate,
         coach: values.coachId,
-        status: values.status || "active",
+        status: values.status || 'active',
         branch: values.branchId || selectedBranch || undefined,
       };
 
-      if (customerType === "existing") {
+      if (customerType === 'existing') {
         // Multi-select: สร้าง lesson ให้แต่ละคนที่เลือก
         const courseIds = Array.isArray(values.courseIds)
           ? values.courseIds
@@ -290,13 +294,13 @@ const Schedule = () => {
         for (const cid of courseIds) {
           await addLesson(cid, payload);
         }
-      } else if (customerType === "new") {
+      } else if (customerType === 'new') {
         const newCourseData = {
           studentName: values.newStudentName,
           packagePrice: values.packagePrice || 0,
           totalLessons: values.totalLessons || 1,
           commissionRate: values.commissionRate || 40,
-          company: values.company || "",
+          company: values.company || '',
         };
         const targetBranch = values.branchId || selectedBranch;
         if (targetBranch) newCourseData.branch = [targetBranch];
@@ -306,8 +310,8 @@ const Schedule = () => {
       }
 
       toast({
-        title: "เพิ่มนัดหมายสำเร็จ",
-        status: "success",
+        title: 'เพิ่มนัดหมายสำเร็จ',
+        status: 'success',
         duration: 3000,
         isClosable: true,
       });
@@ -317,9 +321,9 @@ const Schedule = () => {
     } catch (err) {
       console.error(err);
       toast({
-        title: "เกิดข้อผิดพลาด",
+        title: 'เกิดข้อผิดพลาด',
         description: err.response?.data?.error || err.message,
-        status: "error",
+        status: 'error',
       });
     } finally {
       setIsSaving(false);
@@ -333,7 +337,7 @@ const Schedule = () => {
       status: lesson.status,
       coachId: lesson.coach?._id,
       date: dayjs(lesson.lessonDate),
-      time: dayjs(lesson.lessonDate).format("HH:00"),
+      time: dayjs(lesson.lessonDate).format('HH:00'),
       branchId: lesson.branch?._id || lesson.branch,
       commissionRate: lesson.commissionRate || sc?.commissionRate || undefined,
       company: lesson.company || sc?.company || undefined,
@@ -347,7 +351,7 @@ const Schedule = () => {
       // UX Delay 2 seconds
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      const formattedDate = values.date.format("YYYY-MM-DD");
+      const formattedDate = values.date.format('YYYY-MM-DD');
       const lessonDate = new Date(`${formattedDate}T${values.time}:00`);
 
       const payload = {
@@ -361,13 +365,13 @@ const Schedule = () => {
       if (values.company) payload.company = values.company;
 
       await updateLesson(
-        editingLesson.sc?._id || "standalone",
+        editingLesson.sc?._id || 'standalone',
         editingLesson.lesson._id,
         payload,
       );
       toast({
-        title: "อัปเดตข้อมูลสำเร็จ",
-        status: "success",
+        title: 'อัปเดตข้อมูลสำเร็จ',
+        status: 'success',
         duration: 2000,
         isClosable: true,
       });
@@ -377,9 +381,9 @@ const Schedule = () => {
     } catch (err) {
       console.error(err);
       toast({
-        title: "อัปเดตไม่สำเร็จ",
+        title: 'อัปเดตไม่สำเร็จ',
         description: err.response?.data?.error || err.message,
-        status: "error",
+        status: 'error',
       });
     } finally {
       setIsSaving(false);
@@ -390,8 +394,8 @@ const Schedule = () => {
     try {
       await updateLesson(courseId, lessonId, { status: newStatus });
       toast({
-        title: "อัปเดตสถานะสำเร็จ",
-        status: "success",
+        title: 'อัปเดตสถานะสำเร็จ',
+        status: 'success',
         duration: 2000,
         isClosable: true,
       });
@@ -399,9 +403,9 @@ const Schedule = () => {
     } catch (err) {
       console.error(err);
       toast({
-        title: "อัปเดตสถานะไม่สำเร็จ",
+        title: 'อัปเดตสถานะไม่สำเร็จ',
         description: err.message,
-        status: "error",
+        status: 'error',
       });
     }
   };
@@ -413,7 +417,7 @@ const Schedule = () => {
         const data = await getBranches();
         setBranches(data || []);
       } catch (err) {
-        console.error("Failed to load branches", err);
+        console.error('Failed to load branches', err);
       }
     };
     loadBranches();
@@ -422,8 +426,8 @@ const Schedule = () => {
   // Date navigation
   const goToday = () => setSelectedDate(fmtDate(new Date()));
   const goPrev = () => {
-    const d = new Date(selectedDate + "T00:00:00");
-    if (viewMode === "monthly") {
+    const d = new Date(selectedDate + 'T00:00:00');
+    if (viewMode === 'monthly') {
       d.setDate(1);
       d.setMonth(d.getMonth() - 1);
     } else {
@@ -432,8 +436,8 @@ const Schedule = () => {
     setSelectedDate(fmtDate(d));
   };
   const goNext = () => {
-    const d = new Date(selectedDate + "T00:00:00");
-    if (viewMode === "monthly") {
+    const d = new Date(selectedDate + 'T00:00:00');
+    if (viewMode === 'monthly') {
       d.setDate(1);
       d.setMonth(d.getMonth() + 1);
     } else {
@@ -447,7 +451,7 @@ const Schedule = () => {
     let coaches = [...(dailyData.coaches || [])];
 
     // Sort so logged-in user is first
-    const userData = localStorage.getItem("user");
+    const userData = localStorage.getItem('user');
     if (userData) {
       try {
         const user = JSON.parse(userData);
@@ -461,7 +465,7 @@ const Schedule = () => {
           }
         }
       } catch (e) {
-        console.error("Failed to parse user data for sorting", e);
+        console.error('Failed to parse user data for sorting', e);
       }
     }
 
@@ -479,7 +483,7 @@ const Schedule = () => {
     (dailyData.lessons || []).forEach((lesson) => {
       if (!lesson.coach) return;
       const d = new Date(lesson.lessonDate);
-      const h = String(d.getHours()).padStart(2, "0");
+      const h = String(d.getHours()).padStart(2, '0');
       const timeKey = `${h}:00`;
       const coachId = lesson.coach._id;
 
@@ -502,8 +506,8 @@ const Schedule = () => {
 
   // Monthly calendar data
   const calendarDays = useMemo(() => {
-    if (viewMode !== "monthly") return [];
-    const [y, m] = monthStr.split("-").map(Number);
+    if (viewMode !== 'monthly') return [];
+    const [y, m] = monthStr.split('-').map(Number);
     const firstDay = new Date(y, m - 1, 1);
     const lastDay = new Date(y, m, 0);
     const daysInMonth = lastDay.getDate();
@@ -550,7 +554,7 @@ const Schedule = () => {
           {/* Title Area */}
           <Flex align="center">
             <Box
-              bg={"#03337D"}
+              bg={'#03337D'}
               color="white"
               p={2.5}
               borderRadius="xl"
@@ -563,10 +567,10 @@ const Schedule = () => {
                 ตารางการสอนของโค้ช
               </Heading>
 
-              {viewMode === "daily" && (
+              {viewMode === 'daily' && (
                 <Flex
                   mt="2"
-                  gap={{ base: "2", md: "4" }}
+                  gap={{ base: '2', md: '4' }}
                   fontSize="xs"
                   color="gray.500"
                   flexWrap="wrap"
@@ -600,13 +604,13 @@ const Schedule = () => {
         </Flex>
 
         <Flex align="center" gap="3">
-          {JSON.parse(localStorage.getItem("user") || "{}").role ===
-            "admin" && (
+          {JSON.parse(localStorage.getItem('user') || '{}').role ===
+            'admin' && (
             <Button
               size="md"
-              bg={"#03337D"}
-              _hover={{ bg: "#021841" }}
-              color={"#FFF"}
+              bg={'#03337D'}
+              _hover={{ bg: '#021841' }}
+              color={'#FFF'}
               leftIcon={<IoIosAddCircle size="20" />}
               onClick={openAddModal}
               borderRadius="lg"
@@ -625,25 +629,25 @@ const Schedule = () => {
           >
             <Button
               size="sm"
-              bg={viewMode === "daily" ? "white" : "transparent"}
-              color={viewMode === "daily" ? "#03337D" : "gray.500"}
-              boxShadow={viewMode === "daily" ? "sm" : "none"}
-              onClick={() => setViewMode("daily")}
+              bg={viewMode === 'daily' ? 'white' : 'transparent'}
+              color={viewMode === 'daily' ? '#03337D' : 'gray.500'}
+              boxShadow={viewMode === 'daily' ? 'sm' : 'none'}
+              onClick={() => setViewMode('daily')}
               borderRadius="lg"
               px="4"
-              _hover={{ bg: viewMode === "daily" ? "white" : "gray.100" }}
+              _hover={{ bg: viewMode === 'daily' ? 'white' : 'gray.100' }}
             >
               รายวัน
             </Button>
             <Button
               size="sm"
-              bg={viewMode === "monthly" ? "white" : "transparent"}
-              color={viewMode === "monthly" ? "#03337D" : "gray.500"}
-              boxShadow={viewMode === "monthly" ? "sm" : "none"}
-              onClick={() => setViewMode("monthly")}
+              bg={viewMode === 'monthly' ? 'white' : 'transparent'}
+              color={viewMode === 'monthly' ? '#03337D' : 'gray.500'}
+              boxShadow={viewMode === 'monthly' ? 'sm' : 'none'}
+              onClick={() => setViewMode('monthly')}
               borderRadius="lg"
               px="4"
-              _hover={{ bg: viewMode === "monthly" ? "white" : "gray.100" }}
+              _hover={{ bg: viewMode === 'monthly' ? 'white' : 'gray.100' }}
             >
               รายเดือน
             </Button>
@@ -663,8 +667,8 @@ const Schedule = () => {
       >
         <Flex
           justify="space-between"
-          align={{ base: "flex-start", lg: "center" }}
-          direction={{ base: "column", lg: "row" }}
+          align={{ base: 'flex-start', lg: 'center' }}
+          direction={{ base: 'column', lg: 'row' }}
           gap="4"
         >
           {/* Left: Date Navigation */}
@@ -693,47 +697,49 @@ const Schedule = () => {
             >
               วันนี้
             </Button>
-            <Input
-              type={viewMode === "daily" ? "date" : "month"}
-              value={viewMode === "daily" ? selectedDate : monthStr}
-              onChange={(e) => {
-                if (viewMode === "daily") {
-                  setSelectedDate(e.target.value);
+            <DatePicker
+              picker={viewMode === 'daily' ? 'date' : 'month'}
+              value={dayjs(viewMode === 'daily' ? selectedDate : monthStr)}
+              format={viewMode === 'daily' ? 'DD/MM/YYYY' : 'MM/YYYY'}
+              allowClear={false}
+              inputReadOnly
+              onChange={(value) => {
+                if (!value) return;
+                if (viewMode === 'daily') {
+                  setSelectedDate(value.format('YYYY-MM-DD'));
                 } else {
-                  setSelectedDate(`${e.target.value}-01`);
+                  setSelectedDate(`${value.format('YYYY-MM')}-01`);
                 }
               }}
-              bg="gray.50"
-              borderRadius="lg"
-              w="180px"
-              size="sm"
+              style={{ width: 230 }}
+              size="middle"
             />
             <Box>
               <Text fontSize="lg" fontWeight="bold" color="gray.800">
-                {viewMode === "daily"
+                {viewMode === 'daily'
                   ? `วัน${thaiDay}ที่ ${fmtThaiDate(dateObj)}`
                   : `${THAI_MONTHS[dateObj.getMonth()]} ${dateObj.getFullYear()}`}
               </Text>
             </Box>
 
-            {viewMode === "daily" && (
+            {viewMode === 'daily' && (
               <Badge
-                bg={"#021841"}
-                color={"white"}
+                bg={'#021841'}
+                color={'white'}
                 fontSize="xs"
                 borderRadius="full"
                 px="3"
                 py="1"
               >
-                {(dailyData.lessons || []).filter((l) => l.status !== "legacy")
-                  .length || 0}{" "}
+                {(dailyData.lessons || []).filter((l) => l.status !== 'legacy')
+                  .length || 0}{' '}
                 รายการ
               </Badge>
             )}
           </Flex>
 
           {/* Right: Branch Selector */}
-          <Flex align="center" gap="3" w={{ base: "100%", lg: "auto" }}>
+          <Flex align="center" gap="3" w={{ base: '100%', lg: 'auto' }}>
             <Text
               fontWeight="bold"
               fontSize="sm"
@@ -745,7 +751,7 @@ const Schedule = () => {
             <Select
               size="sm"
               borderRadius="lg"
-              maxW={{ base: "100%", lg: "250px" }}
+              maxW={{ base: '100%', lg: '250px' }}
               flex="1"
               value={selectedBranch}
               onChange={(e) => setSelectedBranch(e.target.value)}
@@ -765,7 +771,7 @@ const Schedule = () => {
                 px="3"
                 py="1"
                 fontSize="xs"
-                display={{ base: "none", md: "inline-block" }}
+                display={{ base: 'none', md: 'inline-block' }}
               >
                 {branches.find((b) => b._id === selectedBranch)?.name}
               </Badge>
@@ -775,7 +781,7 @@ const Schedule = () => {
       </Box>
 
       {/* ===== DAILY VIEW (Excel-like) ===== */}
-      {viewMode === "daily" && (
+      {viewMode === 'daily' && (
         <Box
           bg="white"
           borderRadius="2xl"
@@ -800,33 +806,33 @@ const Schedule = () => {
             <Box
               overflowX="auto"
               overflowY="auto"
-              maxH={{ base: "70vh", lg: "calc(100vh - 260px)" }}
+              maxH={{ base: '70vh', lg: 'calc(100vh - 260px)' }}
               css={{
-                "&::-webkit-scrollbar": {
-                  height: "8px",
-                  width: "8px",
+                '&::-webkit-scrollbar': {
+                  height: '8px',
+                  width: '8px',
                 },
-                "@media (max-width: 768px)": {
-                  "&::-webkit-scrollbar": {
-                    display: "none",
+                '@media (max-width: 768px)': {
+                  '&::-webkit-scrollbar': {
+                    display: 'none',
                   },
-                  msOverflowStyle: "none",
-                  scrollbarWidth: "none",
+                  msOverflowStyle: 'none',
+                  scrollbarWidth: 'none',
                 },
-                "&::-webkit-scrollbar-track": { bg: "transparent" },
-                "&::-webkit-scrollbar-thumb": {
-                  bg: "gray.300",
-                  borderRadius: "full",
+                '&::-webkit-scrollbar-track': { bg: 'transparent' },
+                '&::-webkit-scrollbar-thumb': {
+                  bg: 'gray.300',
+                  borderRadius: 'full',
                 },
-                WebkitOverflowScrolling: "touch",
+                WebkitOverflowScrolling: 'touch',
               }}
             >
               <Table
                 variant="unstyled"
                 size="sm"
                 sx={{
-                  "td, th": { border: "1px solid", borderColor: "gray.200" },
-                  th: { position: "sticky", top: 0, zIndex: 2, bg: "gray.50" },
+                  'td, th': { border: '1px solid', borderColor: 'gray.200' },
+                  th: { position: 'sticky', top: 0, zIndex: 2, bg: 'gray.50' },
                 }}
               >
                 <Thead>
@@ -838,8 +844,8 @@ const Schedule = () => {
                       fontSize="xs"
                       fontWeight="bold"
                       textAlign="center"
-                      minW={{ base: "75px", md: "80px" }}
-                      w={{ base: "75px", md: "80px" }}
+                      minW={{ base: '75px', md: '80px' }}
+                      w={{ base: '75px', md: '80px' }}
                       bg="gray.100"
                       position="sticky"
                       left={0}
@@ -859,9 +865,9 @@ const Schedule = () => {
                         fontSize="xs"
                         fontWeight="bold"
                         textAlign="center"
-                        minW={{ base: "90px", md: "130px" }}
-                        w={{ base: "90px", md: "130px" }}
-                        bg={idx % 2 === 0 ? "gray.50" : "white"}
+                        minW={{ base: '90px', md: '130px' }}
+                        w={{ base: '90px', md: '130px' }}
+                        bg={idx % 2 === 0 ? 'gray.50' : 'white'}
                       >
                         <VStack spacing="0">
                           <Text>{coach.nickname || coach.firstNameTh}</Text>
@@ -882,9 +888,9 @@ const Schedule = () => {
                             opacity={0.6}
                             fontWeight="normal"
                           >
-                            {coach.department === "ผู้ฝึกสอน"
-                              ? "Coach"
-                              : "Asst."}
+                            {coach.department === 'ผู้ฝึกสอน'
+                              ? 'Coach'
+                              : 'Coach'}
                           </Text>
                         </VStack>
                       </Th>
@@ -896,7 +902,7 @@ const Schedule = () => {
                     return (
                       <Tr
                         key={time}
-                        bg={timeIdx % 2 === 0 ? "white" : "gray.50"}
+                        bg={timeIdx % 2 === 0 ? 'white' : 'gray.50'}
                       >
                         <Td
                           py="2"
@@ -904,13 +910,13 @@ const Schedule = () => {
                           fontWeight="bold"
                           fontSize="sm"
                           textAlign="center"
-                          color={"gray.600"}
-                          bg={timeIdx % 2 === 0 ? "gray.50" : "gray.100"}
+                          color={'gray.600'}
+                          bg={timeIdx % 2 === 0 ? 'gray.50' : 'gray.100'}
                           position="sticky"
                           left={0}
                           zIndex={1}
-                          minW={{ base: "75px", md: "80px" }}
-                          w={{ base: "75px", md: "80px" }}
+                          minW={{ base: '75px', md: '80px' }}
+                          w={{ base: '75px', md: '80px' }}
                           boxShadow="1px 0 0 0 var(--chakra-colors-gray-200)"
                           whiteSpace="nowrap"
                         >
@@ -955,12 +961,12 @@ const Schedule = () => {
                                     cursor="pointer"
                                     onClick={() => openEditModal(lesson, sc)}
                                     mb={
-                                      lIdx < cellLessons.length - 1 ? "1" : "0"
+                                      lIdx < cellLessons.length - 1 ? '1' : '0'
                                     }
                                     _hover={{
                                       opacity: 0.8,
-                                      transform: "scale(1.02)",
-                                      boxShadow: "sm",
+                                      transform: 'scale(1.02)',
+                                      boxShadow: 'sm',
                                     }}
                                     transition="all 0.15s"
                                   >
@@ -968,18 +974,18 @@ const Schedule = () => {
                                       fontSize="xs"
                                       fontWeight="bold"
                                       color={
-                                        lesson.status === "test"
-                                          ? "purple.700"
+                                        lesson.status === 'test'
+                                          ? 'purple.700'
                                           : statusInfo.color
                                       }
                                       lineHeight="1.2"
                                       noOfLines={1}
                                     >
-                                      {lesson.status === "test"
-                                        ? lesson.testCustomerName || "Test"
-                                        : sc?.studentName || "N/A"}
+                                      {lesson.status === 'test'
+                                        ? lesson.testCustomerName || 'Test'
+                                        : sc?.studentName || 'N/A'}
                                     </Text>
-                                    {lesson.status === "test" && (
+                                    {lesson.status === 'test' && (
                                       <Badge
                                         colorScheme="purple"
                                         fontSize="8px"
@@ -992,24 +998,24 @@ const Schedule = () => {
                                       </Badge>
                                     )}
                                     <Flex align="center" gap="1" mt="0.5">
-                                      {lesson.status !== "test" && (
+                                      {lesson.status !== 'test' && (
                                         <Text fontSize="10px" color="gray.500">
                                           {lesson.lessonNumber}/
-                                          {sc?.totalLessons || "-"}
+                                          {sc?.totalLessons || '-'}
                                         </Text>
                                       )}
-                                      {lesson.status === "completed" ? (
+                                      {lesson.status === 'completed' ? (
                                         <CheckCircle
                                           size="12"
                                           color="#38A169"
                                         />
-                                      ) : lesson.status === "no_show" ? (
+                                      ) : lesson.status === 'no_show' ? (
                                         <XCircle size="12" color="#E53E3E" />
                                       ) : lesson.status ===
-                                        "test" ? null : lesson.status ===
-                                        "booked" ? (
+                                        'test' ? null : lesson.status ===
+                                        'booked' ? (
                                         <Clock size="12" color="#3182CE" />
-                                      ) : lesson.status === "cancelled" ? (
+                                      ) : lesson.status === 'cancelled' ? (
                                         <AlertCircle
                                           size="12"
                                           color="#A0AEC0"
@@ -1038,20 +1044,20 @@ const Schedule = () => {
       )}
 
       {/* ===== MONTHLY VIEW (Calendar) ===== */}
-      {viewMode === "monthly" && (
+      {viewMode === 'monthly' && (
         <SimpleGrid columns={{ base: 1, lg: 3 }} spacing="6">
           {/* Calendar Grid */}
-          <Box gridColumn={{ lg: "span 2" }}>
+          <Box gridColumn={{ lg: 'span 2' }}>
             <Box
               bg="white"
-              p={{ base: "2", md: "5" }}
+              p={{ base: '2', md: '5' }}
               borderRadius="2xl"
               boxShadow="sm"
               borderWidth="1px"
               borderColor="gray.100"
             >
               <Heading size="md" mb="4" color="gray.800">
-                📅 ปฏิทินเดือน {THAI_MONTHS[dateObj.getMonth()]}{" "}
+                📅 ปฏิทินเดือน {THAI_MONTHS[dateObj.getMonth()]}{' '}
                 {dateObj.getFullYear()}
               </Heading>
 
@@ -1072,10 +1078,10 @@ const Schedule = () => {
                         fontWeight="bold"
                         color={
                           i === 0
-                            ? "red.500"
+                            ? 'red.500'
                             : i === 6
-                              ? "purple.500"
-                              : "gray.500"
+                              ? 'purple.500'
+                              : 'gray.500'
                         }
                       >
                         {d}
@@ -1097,14 +1103,14 @@ const Schedule = () => {
                       return (
                         <Box
                           key={day}
-                          p={{ base: "1", md: "2" }}
+                          p={{ base: '1', md: '2' }}
                           borderRadius="lg"
-                          bg={isToday ? "blue.50" : "gray.50"}
-                          borderWidth={isToday ? "2px" : "1px"}
-                          borderColor={isToday ? "blue.400" : "gray.100"}
-                          minH={{ base: "50px", md: "65px" }}
+                          bg={isToday ? 'blue.50' : 'gray.50'}
+                          borderWidth={isToday ? '2px' : '1px'}
+                          borderColor={isToday ? 'blue.400' : 'gray.100'}
+                          minH={{ base: '50px', md: '65px' }}
                           cursor="pointer"
-                          _hover={{ bg: "blue.50", borderColor: "blue.300" }}
+                          _hover={{ bg: 'blue.50', borderColor: 'blue.300' }}
                           transition="all 0.15s"
                           onClick={() => {
                             const clickDate = fmtDate(
@@ -1115,38 +1121,38 @@ const Schedule = () => {
                               ),
                             );
                             setSelectedDate(clickDate);
-                            setViewMode("daily");
+                            setViewMode('daily');
                           }}
                         >
                           <Text
                             fontSize="sm"
-                            fontWeight={isToday ? "bold" : "medium"}
-                            color={isToday ? "blue.600" : "gray.700"}
+                            fontWeight={isToday ? 'bold' : 'medium'}
+                            color={isToday ? 'blue.600' : 'gray.700'}
                           >
                             {day}
                           </Text>
-                          {dayLessons.filter((l) => l.status !== "legacy")
+                          {dayLessons.filter((l) => l.status !== 'legacy')
                             .length > 0 && (
                             <Badge
-                              bg={"#021841"}
-                              color={"white"}
+                              bg={'#021841'}
+                              color={'white'}
                               variant="subtle"
-                              fontSize={{ base: "9px", md: "10px" }}
+                              fontSize={{ base: '9px', md: '10px' }}
                               borderRadius="full"
                               mt="1"
-                              px={{ base: "1", md: "2" }}
+                              px={{ base: '1', md: '2' }}
                               width="fit-content"
                               maxW="100%"
                               overflow="hidden"
                               textOverflow="ellipsis"
                             >
                               {
-                                dayLessons.filter((l) => l.status !== "legacy")
+                                dayLessons.filter((l) => l.status !== 'legacy')
                                   .length
                               }
                               <Text
                                 as="span"
-                                display={{ base: "none", md: "inline" }}
+                                display={{ base: 'none', md: 'inline' }}
                                 ml={0.5}
                               >
                                 รายการ
@@ -1177,7 +1183,7 @@ const Schedule = () => {
                   TOTAL LESSON
                 </Heading>
                 <Badge
-                  bg={"#021841"}
+                  bg={'#021841'}
                   color="white"
                   borderRadius="full"
                   px="2"
@@ -1185,7 +1191,7 @@ const Schedule = () => {
                   fontSize="xs"
                 >
                   {(scheduleData?.lessons || []).filter(
-                    (l) => l.status !== "legacy",
+                    (l) => l.status !== 'legacy',
                   ).length || 0}
                 </Badge>
               </Flex>
@@ -1207,15 +1213,15 @@ const Schedule = () => {
                       bg="gray.50"
                       borderRadius="lg"
                       borderLeft="3px solid"
-                      borderLeftColor={idx === 0 ? "#021841" : "#021841"}
+                      borderLeftColor={idx === 0 ? '#021841' : '#021841'}
                     >
                       <Flex justify="space-between" align="center">
                         <Flex align="center" gap="2">
                           <Avatar
                             size="xs"
                             name={`${stat.coach.firstNameTh} ${stat.coach.lastNameTh}`}
-                            bg={idx === 0 ? "#021841" : "#021841"}
-                            color={idx === 0 ? "white" : "white"}
+                            bg={idx === 0 ? '#021841' : '#021841'}
+                            color={idx === 0 ? 'white' : 'white'}
                           />
                           <Box>
                             <Text
@@ -1226,7 +1232,7 @@ const Schedule = () => {
                               {stat.coach.firstNameTh}
                             </Text>
                             <Text fontSize="xs" color="gray.400">
-                              {stat.coach.nickname || ""}
+                              {stat.coach.nickname || ''}
                             </Text>
                           </Box>
                         </Flex>
@@ -1287,7 +1293,7 @@ const Schedule = () => {
         onOk={() => form.submit()}
         okText="บันทึก"
         okButtonProps={{
-          style: { backgroundColor: "#021841", borderColor: "#021841" },
+          style: { backgroundColor: '#021841', borderColor: '#021841' },
         }}
         cancelText="ยกเลิก"
         width={800}
@@ -1309,30 +1315,30 @@ const Schedule = () => {
                 form.resetFields();
                 form.setFieldsValue({
                   branchId: selectedBranch || undefined,
-                  status: "active",
+                  status: 'active',
                 });
               }}
               placeholder="-- เลือกประเภทลูกค้า --"
               options={[
-                { label: "ลูกค้าทดลองเรียน", value: "test" },
-                { label: "ลูกค้าสมัครเรียนแล้ว", value: "existing" },
+                { label: 'ลูกค้าทดลองเรียน', value: 'test' },
+                { label: 'ลูกค้าสมัครเรียนแล้ว', value: 'existing' },
                 // { label: "🆕 ลูกค้าใหม่", value: "new" },
               ]}
             />
           </Form.Item>
 
           {/* ===== Form: ลูกค้าทดลองเรียน ===== */}
-          {customerType === "test" && (
+          {customerType === 'test' && (
             <>
               <Form.Item
                 name="testCustomerName"
                 label="ชื่อลูกค้าทดลอง"
-                rules={[{ required: true, message: "กรุณากรอกชื่อลูกค้า" }]}
+                rules={[{ required: true, message: 'กรุณากรอกชื่อลูกค้า' }]}
               >
                 <Input placeholder="กรอกชื่อลูกค้าที่มาทดลอง..." />
               </Form.Item>
 
-              <Flex gap="4">
+              <Flex gap="4" direction={{ base: 'column', md: 'row' }}>
                 <Form.Item
                   name="referredBy"
                   label="พนักงานผู้แนะนำ"
@@ -1343,11 +1349,11 @@ const Schedule = () => {
                     allowClear
                     placeholder="เลือกพนักงานที่แนะนำลูกค้ามา..."
                     options={allEmployees.map((e) => ({
-                      label: `${e.firstNameTh} ${e.lastNameTh} (${e.nickname || e.position || ""})`,
+                      label: `${e.firstNameTh} ${e.lastNameTh} (${e.nickname || e.position || ''})`,
                       value: e._id,
                     }))}
                     filterOption={(input, option) =>
-                      (option?.label ?? "")
+                      (option?.label ?? '')
                         .toLowerCase()
                         .includes(input.toLowerCase())
                     }
@@ -1358,15 +1364,15 @@ const Schedule = () => {
                   name="company"
                   label="บริษัท (บังคับเลือก)"
                   style={{ flex: 1 }}
-                  rules={[{ required: true, message: "กรุณาเลือกบริษัท" }]}
+                  rules={[{ required: true, message: 'กรุณาเลือกบริษัท' }]}
                 >
                   <AntSelect
                     placeholder="-- เลือกบริษัท --"
                     options={[
-                      { label: "บุญรอดกอล์ฟพัฒนา", value: "บุญรอดกอล์ฟพัฒนา" },
+                      { label: 'บุญรอดกอล์ฟพัฒนา', value: 'บุญรอดกอล์ฟพัฒนา' },
                       {
-                        label: "บุญรอดกอล์ฟโทเทิล",
-                        value: "บุญรอดกอล์ฟโทเทิล",
+                        label: 'บุญรอดกอล์ฟโทเทิล',
+                        value: 'บุญรอดกอล์ฟโทเทิล',
                       },
                     ]}
                   />
@@ -1376,12 +1382,12 @@ const Schedule = () => {
           )}
 
           {/* ===== Form: ลูกค้าสมัครเรียนแล้ว ===== */}
-          {customerType === "existing" && (
+          {customerType === 'existing' && (
             <>
               <Form.Item
                 name="courseIds"
                 label="ลูกค้า (เลือกได้หลายคน)"
-                rules={[{ required: true, message: "กรุณาเลือกลูกค้า" }]}
+                rules={[{ required: true, message: 'กรุณาเลือกลูกค้า' }]}
               >
                 <AntSelect
                   mode="multiple"
@@ -1392,16 +1398,16 @@ const Schedule = () => {
                       ? c.branch
                           .map((b) => b?.name)
                           .filter(Boolean)
-                          .join(", ")
-                      : c.branch?.name || "";
+                          .join(', ')
+                      : c.branch?.name || '';
                     return {
                       label: `${c.studentName}`,
                       value: c._id,
-                      desc: `เหลือ ${Math.max(0, c.totalLessons - c.lessonsCompleted)}/${c.totalLessons} ครั้ง | คอม ${c.commissionRate}% | ${c.company || branchNames || "-"}`,
+                      desc: `เหลือ ${Math.max(0, c.totalLessons - c.lessonsCompleted)}/${c.totalLessons} ครั้ง | คอม ${c.commissionRate}% | ${c.company || branchNames || '-'}`,
                     };
                   })}
                   filterOption={(input, option) =>
-                    (option?.label ?? "")
+                    (option?.label ?? '')
                       .toLowerCase()
                       .includes(input.toLowerCase())
                   }
@@ -1440,7 +1446,7 @@ const Schedule = () => {
                 />
               </Form.Item>
 
-              <Flex gap="4">
+              <Flex gap="4" direction={{ base: 'column', md: 'row' }}>
                 <Form.Item
                   name="lessonCommissionRate"
                   label="Commission Rate (ครั้งนี้)"
@@ -1450,12 +1456,12 @@ const Schedule = () => {
                     allowClear
                     placeholder="ใช้ค่าตั้งต้นจากคอร์ส"
                     options={[
-                      { label: "40%", value: 40 },
-                      { label: "45%", value: 45 },
-                      { label: "50%", value: 50 },
-                      { label: "55%", value: 55 },
-                      { label: "60%", value: 60 },
-                      { label: "70%", value: 70 },
+                      { label: '40%', value: 40 },
+                      { label: '45%', value: 45 },
+                      { label: '50%', value: 50 },
+                      { label: '55%', value: 55 },
+                      { label: '60%', value: 60 },
+                      { label: '70%', value: 70 },
                     ]}
                   />
                 </Form.Item>
@@ -1468,10 +1474,10 @@ const Schedule = () => {
                     allowClear
                     placeholder="ใช้ค่าตั้งต้นจากคอร์ส"
                     options={[
-                      { label: "บุญรอดกอล์ฟพัฒนา", value: "บุญรอดกอล์ฟพัฒนา" },
+                      { label: 'บุญรอดกอล์ฟพัฒนา', value: 'บุญรอดกอล์ฟพัฒนา' },
                       {
-                        label: "บุญรอดกอล์ฟโทเทิล",
-                        value: "บุญรอดกอล์ฟโทเทิล",
+                        label: 'บุญรอดกอล์ฟโทเทิล',
+                        value: 'บุญรอดกอล์ฟโทเทิล',
                       },
                     ]}
                   />
@@ -1481,24 +1487,24 @@ const Schedule = () => {
           )}
 
           {/* ===== Form: ลูกค้าใหม่ ===== */}
-          {customerType === "new" && (
+          {customerType === 'new' && (
             <>
-              <Flex gap="4">
+              <Flex gap="4" direction={{ base: 'column', md: 'row' }}>
                 <Form.Item
                   name="newStudentName"
                   label="ชื่อลูกค้า"
-                  rules={[{ required: true, message: "กรุณากรอกชื่อลูกค้า" }]}
+                  rules={[{ required: true, message: 'กรุณากรอกชื่อลูกค้า' }]}
                   style={{ flex: 1 }}
                 >
                   <Input placeholder="เช่น นายเอ" />
                 </Form.Item>
               </Flex>
 
-              <Flex gap="4">
+              <Flex gap="4" direction={{ base: 'column', md: 'row' }}>
                 <Form.Item
                   name="packagePrice"
                   label="ราคาคอร์ส (บาท)"
-                  rules={[{ required: true, message: "กรุณากรอกราคา" }]}
+                  rules={[{ required: true, message: 'กรุณากรอกราคา' }]}
                   style={{ flex: 1 }}
                 >
                   <Input type="number" placeholder="30000" />
@@ -1506,7 +1512,7 @@ const Schedule = () => {
                 <Form.Item
                   name="totalLessons"
                   label="จำนวนครั้ง"
-                  rules={[{ required: true, message: "กรุณากรอกจำนวน" }]}
+                  rules={[{ required: true, message: 'กรุณากรอกจำนวน' }]}
                   style={{ flex: 1 }}
                 >
                   <Input type="number" placeholder="25" />
@@ -1520,12 +1526,12 @@ const Schedule = () => {
               >
                 <AntSelect
                   options={[
-                    { label: "40%", value: 40 },
-                    { label: "45%", value: 45 },
-                    { label: "50%", value: 50 },
-                    { label: "55%", value: 55 },
-                    { label: "60%", value: 60 },
-                    { label: "70%", value: 70 },
+                    { label: '40%', value: 40 },
+                    { label: '45%', value: 45 },
+                    { label: '50%', value: 50 },
+                    { label: '55%', value: 55 },
+                    { label: '60%', value: 60 },
+                    { label: '70%', value: 70 },
                   ]}
                 />
               </Form.Item>
@@ -1535,11 +1541,11 @@ const Schedule = () => {
           {/* ===== Common fields (show only when type is selected) ===== */}
           {customerType && (
             <>
-              <Flex gap="4">
+              <Flex gap="4" direction={{ base: 'column', md: 'row' }}>
                 <Form.Item
                   name="branchId"
                   label="สาขา"
-                  rules={[{ required: true, message: "กรุณาเลือกสาขา" }]}
+                  rules={[{ required: true, message: 'กรุณาเลือกสาขา' }]}
                   initialValue={selectedBranch || undefined}
                   style={{ flex: 1 }}
                 >
@@ -1551,15 +1557,15 @@ const Schedule = () => {
                     placeholder="เลือกสาขา"
                     onChange={(val) => {
                       const selectedBr = branches.find((b) => b._id === val);
-                      const branchCode = selectedBr?.code || "";
-                      if (branchCode === "teeoff") {
-                        form.setFieldsValue({ company: "บุญรอดกอล์ฟพัฒนา" });
+                      const branchCode = selectedBr?.code || '';
+                      if (branchCode === 'teeoff') {
+                        form.setFieldsValue({ company: 'บุญรอดกอล์ฟพัฒนา' });
                       } else if (
-                        branchCode === "srinakarin" ||
-                        branchCode === "suwannaphum"
+                        branchCode === 'srinakarin' ||
+                        branchCode === 'suwannaphum'
                       ) {
-                        form.setFieldsValue({ company: "บุญรอดกอล์ฟโทเทิล" });
-                      } else if (branchCode === "ratchada") {
+                        form.setFieldsValue({ company: 'บุญรอดกอล์ฟโทเทิล' });
+                      } else if (branchCode === 'ratchada') {
                         form.setFieldsValue({ company: undefined });
                       } else {
                         form.setFieldsValue({ company: undefined });
@@ -1571,32 +1577,30 @@ const Schedule = () => {
                 <Form.Item
                   name="coachId"
                   label="โค้ชผู้สอน"
-                  rules={[{ required: true, message: "กรุณาเลือกโค้ช" }]}
+                  rules={[{ required: true, message: 'กรุณาเลือกโค้ช' }]}
                   style={{ flex: 1 }}
                 >
                   <AntSelect
                     placeholder="เลือกโค้ช"
-                    options={allEmployees
-                      .filter((emp) => emp.position === "Coach")
-                      .map((c) => ({
-                        label: `${c.firstNameTh} (${c.nickname || ""})`,
-                        value: c._id,
-                      }))}
+                    options={coachesList.map((c) => ({
+                      label: `${c.firstNameTh} (${c.nickname || ''})`,
+                      value: c._id,
+                    }))}
                   />
                 </Form.Item>
               </Flex>
 
-              {customerType === "new" && (
+              {customerType === 'new' && (
                 <Form.Item
                   noStyle
                   shouldUpdate={(prev, cur) => prev.branchId !== cur.branchId}
                 >
                   {() => {
-                    const branchId = form.getFieldValue("branchId");
+                    const branchId = form.getFieldValue('branchId');
                     const selectedBr = branches.find((b) => b._id === branchId);
-                    const branchCode = selectedBr?.code || "";
-                    const isRatchada = branchCode === "ratchada";
-                    const autoCompany = form.getFieldValue("company");
+                    const branchCode = selectedBr?.code || '';
+                    const isRatchada = branchCode === 'ratchada';
+                    const autoCompany = form.getFieldValue('company');
                     const showField = branchId && (isRatchada || autoCompany);
 
                     if (!showField) return null;
@@ -1608,12 +1612,12 @@ const Schedule = () => {
                             placeholder="-- เลือกบริษัท --"
                             options={[
                               {
-                                label: "บุญรอดกอล์ฟพัฒนา",
-                                value: "บุญรอดกอล์ฟพัฒนา",
+                                label: 'บุญรอดกอล์ฟพัฒนา',
+                                value: 'บุญรอดกอล์ฟพัฒนา',
                               },
                               {
-                                label: "บุญรอดกอล์ฟโทเทิล",
-                                value: "บุญรอดกอล์ฟโทเทิล",
+                                label: 'บุญรอดกอล์ฟโทเทิล',
+                                value: 'บุญรอดกอล์ฟโทเทิล',
                               },
                             ]}
                           />
@@ -1626,7 +1630,7 @@ const Schedule = () => {
                 </Form.Item>
               )}
 
-              {customerType !== "test" && (
+              {customerType !== 'test' && (
                 <Form.Item
                   name="status"
                   label="สถานะเริ่มต้น"
@@ -1634,30 +1638,30 @@ const Schedule = () => {
                 >
                   <AntSelect
                     options={[
-                      { label: "รอคอนเฟิร์ม", value: "active" },
-                      { label: "จองคลาส", value: "booked" },
-                      { label: "มาเรียนแล้ว", value: "completed" },
-                      { label: "ไม่มาเรียน (หักชั่วโมง)", value: "no_show" },
-                      { label: "ยกเลิกคลาส", value: "cancelled" },
+                      { label: 'รอคอนเฟิร์ม', value: 'active' },
+                      { label: 'จองคลาส', value: 'booked' },
+                      { label: 'มาเรียนแล้ว', value: 'completed' },
+                      { label: 'ไม่มาเรียน (หักชั่วโมง)', value: 'no_show' },
+                      { label: 'ยกเลิกคลาส', value: 'cancelled' },
                     ]}
                   />
                 </Form.Item>
               )}
 
-              <Flex gap="4">
+              <Flex gap="4" direction={{ base: 'column', md: 'row' }}>
                 <Form.Item
                   name="date"
                   label="วันที่เรียน"
-                  rules={[{ required: true, message: "กรุณาเลือกวันที่" }]}
+                  rules={[{ required: true, message: 'กรุณาเลือกวันที่' }]}
                   style={{ flex: 1 }}
                 >
-                  <DatePicker style={{ width: "100%" }} format="DD/MM/YYYY" />
+                  <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
                 </Form.Item>
 
                 <Form.Item
                   name="time"
                   label="เวลา (น.)"
-                  rules={[{ required: true, message: "กรุณาเลือกเวลา" }]}
+                  rules={[{ required: true, message: 'กรุณาเลือกเวลา' }]}
                   style={{ flex: 1 }}
                 >
                   <AntSelect
@@ -1680,7 +1684,7 @@ const Schedule = () => {
           setEditingLesson(null);
         }}
         footer={
-          JSON.parse(localStorage.getItem("user") || "{}").role === "admin"
+          JSON.parse(localStorage.getItem('user') || '{}').role === 'admin'
             ? undefined
             : [
                 <Button key="close" onClick={() => setIsEditModalOpen(false)}>
@@ -1691,18 +1695,18 @@ const Schedule = () => {
         onOk={() => editForm.submit()}
         okText="บันทึก"
         okButtonProps={{
-          style: { backgroundColor: "#021841", borderColor: "#021841" },
+          style: { backgroundColor: '#021841', borderColor: '#021841' },
         }}
         cancelText="ยกเลิก"
         destroyOnClose
       >
-        {editingLesson?.lesson?.status !== "test" && (
+        {editingLesson?.lesson?.status !== 'test' && (
           <Box mb="4" p="3" bg="blue.50" borderRadius="md">
             <Text fontWeight="bold" color="blue.700">
               {editingLesson?.sc?.studentName}
             </Text>
             <Text fontSize="sm" color="blue.600">
-              ครั้งที่ {editingLesson?.lesson?.lessonNumber} /{" "}
+              ครั้งที่ {editingLesson?.lesson?.lessonNumber} /{' '}
               {editingLesson?.sc?.totalLessons}
             </Text>
           </Box>
@@ -1716,52 +1720,50 @@ const Schedule = () => {
           <Form.Item name="status" label="สถานะ">
             <AntSelect
               disabled={
-                JSON.parse(localStorage.getItem("user") || "{}").role !==
-                "admin"
+                JSON.parse(localStorage.getItem('user') || '{}').role !==
+                'admin'
               }
               options={[
-                { label: "รอคอนเฟิร์ม", value: "active" },
-                { label: "จองคลาส", value: "booked" },
-                { label: "มาเรียนแล้ว", value: "completed" },
-                { label: "ไม่มาเรียน (หักชั่วโมง)", value: "no_show" },
-                { label: "ยกเลิกคลาส", value: "cancelled" },
-                { label: "ทดลองเรียน (Test)", value: "test" },
+                { label: 'รอคอนเฟิร์ม', value: 'active' },
+                { label: 'จองคลาส', value: 'booked' },
+                { label: 'มาเรียนแล้ว', value: 'completed' },
+                { label: 'ไม่มาเรียน (หักชั่วโมง)', value: 'no_show' },
+                { label: 'ยกเลิกคลาส', value: 'cancelled' },
+                { label: 'ทดลองเรียน (Test)', value: 'test' },
               ]}
             />
           </Form.Item>
 
-          <Flex gap="4">
+          <Flex gap="4" direction={{ base: 'column', md: 'row' }}>
             <Form.Item
               name="coachId"
               label="เปลี่ยนโค้ชผู้สอน"
-              rules={[{ required: true, message: "กรุณาเลือกโค้ช" }]}
+              rules={[{ required: true, message: 'กรุณาเลือกโค้ช' }]}
               style={{ flex: 1 }}
             >
               <AntSelect
                 placeholder="เลือกโค้ช"
                 disabled={
-                  JSON.parse(localStorage.getItem("user") || "{}").role !==
-                  "admin"
+                  JSON.parse(localStorage.getItem('user') || '{}').role !==
+                  'admin'
                 }
-                options={allEmployees
-                  .filter((emp) => emp.position === "Coach")
-                  .map((c) => ({
-                    label: `${c.firstNameTh} (${c.nickname || ""})`,
-                    value: c._id,
-                  }))}
+                options={coachesList.map((c) => ({
+                  label: `${c.firstNameTh} (${c.nickname || ''})`,
+                  value: c._id,
+                }))}
               />
             </Form.Item>
 
             <Form.Item
               name="branchId"
               label="สาขา"
-              rules={[{ required: true, message: "กรุณาเลือกสาขา" }]}
+              rules={[{ required: true, message: 'กรุณาเลือกสาขา' }]}
               style={{ flex: 1 }}
             >
               <AntSelect
                 disabled={
-                  JSON.parse(localStorage.getItem("user") || "{}").role !==
-                  "admin"
+                  JSON.parse(localStorage.getItem('user') || '{}').role !==
+                  'admin'
                 }
                 options={branches.map((b) => ({
                   label: b.name,
@@ -1772,7 +1774,7 @@ const Schedule = () => {
             </Form.Item>
           </Flex>
 
-          <Flex gap="4">
+          <Flex gap="4" direction={{ base: 'column', md: 'row' }}>
             {/* <Form.Item
               name="commissionRate"
               label="Commission Rate (ครั้งนี้)"
@@ -1804,30 +1806,30 @@ const Schedule = () => {
                 allowClear
                 placeholder="-- เลือกบริษัท --"
                 disabled={
-                  JSON.parse(localStorage.getItem("user") || "{}").role !==
-                  "admin"
+                  JSON.parse(localStorage.getItem('user') || '{}').role !==
+                  'admin'
                 }
                 options={[
-                  { label: "บุญรอดกอล์ฟพัฒนา", value: "บุญรอดกอล์ฟพัฒนา" },
-                  { label: "บุญรอดกอล์ฟโทเทิล", value: "บุญรอดกอล์ฟโทเทิล" },
+                  { label: 'บุญรอดกอล์ฟพัฒนา', value: 'บุญรอดกอล์ฟพัฒนา' },
+                  { label: 'บุญรอดกอล์ฟโทเทิล', value: 'บุญรอดกอล์ฟโทเทิล' },
                 ]}
               />
             </Form.Item>
           </Flex>
 
-          <Flex gap="4">
+          <Flex gap="4" direction={{ base: 'column', md: 'row' }}>
             <Form.Item
               name="date"
               label="วันที่เรียน"
-              rules={[{ required: true, message: "กรุณาเลือกวันที่" }]}
+              rules={[{ required: true, message: 'กรุณาเลือกวันที่' }]}
               style={{ flex: 1 }}
             >
               <DatePicker
                 disabled={
-                  JSON.parse(localStorage.getItem("user") || "{}").role !==
-                  "admin"
+                  JSON.parse(localStorage.getItem('user') || '{}').role !==
+                  'admin'
                 }
-                style={{ width: "100%" }}
+                style={{ width: '100%' }}
                 format="DD/MM/YYYY"
               />
             </Form.Item>
@@ -1835,14 +1837,14 @@ const Schedule = () => {
             <Form.Item
               name="time"
               label="เวลา (น.)"
-              rules={[{ required: true, message: "กรุณาเลือกเวลา" }]}
+              rules={[{ required: true, message: 'กรุณาเลือกเวลา' }]}
               style={{ flex: 1 }}
             >
               <AntSelect
                 placeholder="เลือกเวลา"
                 disabled={
-                  JSON.parse(localStorage.getItem("user") || "{}").role !==
-                  "admin"
+                  JSON.parse(localStorage.getItem('user') || '{}').role !==
+                  'admin'
                 }
                 options={TIME_SLOTS.map((t) => ({ label: t, value: t }))}
               />

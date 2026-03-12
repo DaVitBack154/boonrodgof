@@ -238,7 +238,7 @@ const MonthlyCommission = () => {
   // ===== Detail Columns - Different for Coach vs Admin =====
   const coachDetailColumns = [
     {
-      title: "วันที่/เวลา",
+      title: "วันที่",
       dataIndex: "lessonDate",
       key: "lessonDate",
       width: 160,
@@ -270,7 +270,7 @@ const MonthlyCommission = () => {
       },
     },
     {
-      title: "ค่าคอม/ครั้ง",
+      title: "ค่าคอม",
       key: "commissionAmount",
       align: "right",
       render: (_, record) => {

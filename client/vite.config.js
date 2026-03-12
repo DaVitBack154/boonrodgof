@@ -14,7 +14,7 @@ export default defineConfig({
     port: 3200, // จะใช้ port อะไรก็ได้
     strictPort: true, // ถ้า port นี้ถูกใช้ จะ error เลย
     allowedHosts: [
-      'fbbe-49-0-85-37.ngrok-free.app', // ใส่ domain ngrok (ลบ https:// ออก)
+      'frenetically-melanospermous-bonita.ngrok-free.dev', // ใส่ domain ngrok (ลบ https:// ออก)
     ],
     proxy: {
       '/api': {
