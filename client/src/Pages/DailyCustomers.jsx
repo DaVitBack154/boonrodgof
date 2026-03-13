@@ -66,6 +66,21 @@ const STATUS_LABELS = {
   test: "ทดลองเรียน",
 };
 
+const getLessonCustomerName = (lesson) =>
+  lesson.studentCourse?.studentName ||
+  lesson.testCustomerName ||
+  (lesson.status === "test" ? "Test Customer" : "N/A");
+
+const isStandaloneLesson = (lesson) => !lesson.studentCourse;
+
+const getLessonCountLabel = (lesson) => {
+  if (lesson.studentCourse?.totalLessons) {
+    return `${lesson.lessonNumber} / ${lesson.studentCourse.totalLessons}`;
+  }
+
+  return `${lesson.lessonNumber || 1}`;
+};
+
 const StatusBadge = ({ status }) => {
   const color = STATUS_COLORS[status] || "#94a3b8";
   const label = STATUS_LABELS[status] || status;
@@ -117,18 +132,14 @@ const DailyCustomers = () => {
         lesson: lesson,
         date: dayjs(lesson.lessonDate).format("DD MMM YYYY"),
         time: dayjs(lesson.lessonDate).format("HH:mm"),
-        customerName:
-          lesson.status === "test"
-            ? lesson.testCustomerName || "Test Customer"
-            : lesson.studentCourse?.studentName || "N/A",
+        customerName: getLessonCustomerName(lesson),
         coachName: lesson.coach
           ? `${lesson.coach.firstNameTh} (${lesson.coach.nickname || ""})`
           : "N/A",
         lessonNumber: lesson.lessonNumber,
-        totalLessons:
-          lesson.status === "test"
-            ? null
-            : lesson.studentCourse?.totalLessons || "-",
+        totalLessons: lesson.studentCourse?.totalLessons || null,
+        lessonCountLabel: getLessonCountLabel(lesson),
+        isStandaloneLesson: isStandaloneLesson(lesson),
         status: lesson.status,
         courseId: lesson.studentCourse?._id,
       }));
@@ -195,10 +206,7 @@ const DailyCustomers = () => {
         rowData.push(`"${dayjs(lesson.lessonDate).format("DD MMM YYYY")}"`);
         rowData.push(`"${dayjs(lesson.lessonDate).format("HH:mm")} น."`);
 
-        const custName =
-          lesson.status === "test"
-            ? lesson.testCustomerName || "Test Customer"
-            : lesson.studentCourse?.studentName || "N/A";
+        const custName = getLessonCustomerName(lesson);
         rowData.push(`"${custName}"`);
 
         const coachName = lesson.coach
@@ -206,12 +214,7 @@ const DailyCustomers = () => {
           : "N/A";
         rowData.push(`"${coachName}"`);
 
-        const totalL =
-          lesson.status === "test"
-            ? null
-            : lesson.studentCourse?.totalLessons || "-";
-        const lessonNum =
-          lesson.status === "test" ? "1" : `${lesson.lessonNumber} / ${totalL}`;
+        const lessonNum = getLessonCountLabel(lesson);
         rowData.push(`"ครั้งที่ ${lessonNum}"`);
 
         const statusText = STATUS_LABELS[lesson.status] || lesson.status;
@@ -323,10 +326,10 @@ const DailyCustomers = () => {
       key: "lessonNumber",
       width: 100,
       render: (_, record) => {
-        if (record.status === "test") {
+        if (record.isStandaloneLesson) {
           return (
             <Text color="gray.600" fontSize="13px">
-              ครั้งที่ 1
+              ครั้งที่ {record.lessonCountLabel}
             </Text>
           );
         }

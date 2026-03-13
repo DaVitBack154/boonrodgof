@@ -135,6 +135,31 @@ const fmtThaiDate = (d) => {
   return `${d.getDate()} ${THAI_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 };
 
+const getLessonCustomerName = (lesson, studentCourse = lesson?.studentCourse) =>
+  studentCourse?.studentName ||
+  lesson?.testCustomerName ||
+  (lesson?.status === 'test' ? 'Test' : 'N/A');
+
+const isStandaloneLesson = (lesson, studentCourse = lesson?.studentCourse) =>
+  !studentCourse;
+
+const isStandaloneTrialLesson = (
+  lesson,
+  studentCourse = lesson?.studentCourse,
+) => !studentCourse && Boolean(lesson?.testCustomerName);
+
+const getLessonProgressText = (
+  lesson,
+  studentCourse = lesson?.studentCourse,
+) => {
+  if (!lesson?.lessonNumber) return null;
+  if (studentCourse?.totalLessons) {
+    return `${lesson.lessonNumber}/${studentCourse.totalLessons}`;
+  }
+
+  return `ครั้งที่ ${lesson.lessonNumber}`;
+};
+
 const Schedule = () => {
   const today = new Date();
   const [selectedDate, setSelectedDate] = useState(fmtDate(today));
@@ -560,6 +585,22 @@ const Schedule = () => {
 
   const dayOfWeek = dateObj.getDay();
   const thaiDay = THAI_DAYS[dayOfWeek];
+  const editingLessonCustomerName = getLessonCustomerName(
+    editingLesson?.lesson,
+    editingLesson?.sc,
+  );
+  const editingLessonStandalone = isStandaloneLesson(
+    editingLesson?.lesson,
+    editingLesson?.sc,
+  );
+  const editingLessonStandaloneTrial = isStandaloneTrialLesson(
+    editingLesson?.lesson,
+    editingLesson?.sc,
+  );
+  const editingLessonProgressText = getLessonProgressText(
+    editingLesson?.lesson,
+    editingLesson?.sc,
+  );
 
   return (
     <Box>
@@ -976,6 +1017,9 @@ const Schedule = () => {
                             >
                               {cellLessons.map((lesson, lIdx) => {
                                 const sc = lesson.studentCourse;
+                                const customerName = getLessonCustomerName(lesson, sc);
+                                const standaloneTrialLesson = isStandaloneTrialLesson(lesson, sc);
+                                const lessonProgressText = getLessonProgressText(lesson, sc);
                                 const statusInfo =
                                   STATUS_COLORS[lesson.status] ||
                                   STATUS_COLORS.completed;
@@ -1003,18 +1047,16 @@ const Schedule = () => {
                                       fontSize="xs"
                                       fontWeight="bold"
                                       color={
-                                        lesson.status === 'test'
+                                        standaloneTrialLesson
                                           ? 'purple.700'
                                           : statusInfo.color
                                       }
                                       lineHeight="1.2"
                                       noOfLines={1}
                                     >
-                                      {lesson.status === 'test'
-                                        ? lesson.testCustomerName || 'Test'
-                                        : sc?.studentName || 'N/A'}
+                                      {customerName}
                                     </Text>
-                                    {lesson.status === 'test' && (
+                                    {standaloneTrialLesson && (
                                       <Badge
                                         colorScheme="purple"
                                         fontSize="8px"
@@ -1027,10 +1069,9 @@ const Schedule = () => {
                                       </Badge>
                                     )}
                                     <Flex align="center" gap="1" mt="0.5">
-                                        {lesson.status !== 'test' && (
+                                        {lessonProgressText && (
                                         <Text fontSize="10px" color="gray.500">
-                                          {lesson.lessonNumber}/
-                                          {sc?.totalLessons || '-'}
+                                          {lessonProgressText}
                                           {lesson.duration > 1 ? ` (${lesson.duration}ชม)` : ''}
                                         </Text>
                                       )}
@@ -1750,14 +1791,17 @@ const Schedule = () => {
         cancelText="ยกเลิก"
         destroyOnClose
       >
-        {editingLesson?.lesson?.status !== 'test' && (
+        {editingLesson?.lesson && (
           <Box mb="4" p="3" bg="blue.50" borderRadius="md">
             <Text fontWeight="bold" color="blue.700">
-              {editingLesson?.sc?.studentName}
+              {editingLessonCustomerName}
             </Text>
             <Text fontSize="sm" color="blue.600">
-              ครั้งที่ {editingLesson?.lesson?.lessonNumber} /{' '}
-              {editingLesson?.sc?.totalLessons}
+              {editingLessonStandalone
+                ? `${editingLessonStandaloneTrial ? 'คลาสทดลอง' : 'รายการนี้ไม่มีคอร์สผูกไว้'}${
+                    editingLessonProgressText ? ` | ${editingLessonProgressText}` : ''
+                  }`
+                : `ครั้งที่ ${editingLesson?.lesson?.lessonNumber} / ${editingLesson?.sc?.totalLessons}`}
             </Text>
           </Box>
         )}
