@@ -117,8 +117,8 @@ const STATUS_COLORS = {
   active: { bg: 'orange.50', color: 'orange.600', label: 'รอคอนเฟิร์ม' },
   booked: { bg: 'blue.50', color: 'blue.600', label: 'จองคลาส' },
   completed: { bg: 'green.50', color: 'green.700', label: 'มาเรียนแล้ว' },
-  no_show: { bg: 'red.50', color: 'red.600', label: 'ไม่มาเรียน (หักชั่วโมง)' },
-  cancelled: { bg: 'gray.100', color: 'gray.500', label: 'ยกเลิกคลาส' },
+  no_show: { bg: 'green.50', color: 'green.700', label: 'ไม่มาเรียน (หักชั่วโมง)' },
+  cancelled: { bg: 'red.50', color: 'red.600', label: 'ยกเลิกคลาส' },
   test: { bg: 'purple.50', color: 'purple.600', label: 'ทดลองเรียน' },
 };
 
@@ -222,6 +222,7 @@ const Schedule = () => {
     form.setFieldsValue({
       status: 'active',
       branchId: selectedBranch || undefined,
+      duration: 1,
     });
     loadActiveCourses();
     loadEmployees();
@@ -237,12 +238,14 @@ const Schedule = () => {
       // === Test Mode: สร้าง test lesson โดยไม่ต้องมี course ===
       if (customerType === 'test') {
         const formattedDate = values.date.format('YYYY-MM-DD');
-        const lessonDate = new Date(`${formattedDate}T${values.time}:00`);
+        const timeStr = Array.isArray(values.time) ? [...values.time].sort()[0] : values.time;
+        const lessonDate = new Date(`${formattedDate}T${timeStr}:00`);
 
         const payload = {
           testCustomerName: values.testCustomerName,
           coach: values.coachId,
           lessonDate,
+          duration: values.duration || 1,
           referredBy: values.referredBy || undefined,
           branch: values.branchId || selectedBranch || undefined,
           company: values.company || '',
@@ -263,13 +266,15 @@ const Schedule = () => {
 
       // === Existing or New Customer ===
       const formattedDate = values.date.format('YYYY-MM-DD');
-      const lessonDate = new Date(`${formattedDate}T${values.time}:00`);
+      const timeStr = Array.isArray(values.time) ? [...values.time].sort()[0] : values.time;
+      const lessonDate = new Date(`${formattedDate}T${timeStr}:00`);
 
       const payload = {
         lessonDate,
         coach: values.coachId,
         status: values.status || 'active',
         branch: values.branchId || selectedBranch || undefined,
+        duration: values.duration || 1,
       };
 
       if (customerType === 'existing') {
@@ -333,11 +338,21 @@ const Schedule = () => {
   const openEditModal = (lesson, sc) => {
     setEditingLesson({ lesson, sc });
     loadEmployees();
+    
+    const startHour = dayjs(lesson.lessonDate).hour();
+    const duration = lesson.duration || 1;
+    const timeArray = [];
+    for (let i = 0; i < duration; i++) {
+       const h = String(startHour + i).padStart(2, '0');
+       timeArray.push(`${h}:00`);
+    }
+
     editForm.setFieldsValue({
       status: lesson.status,
       coachId: lesson.coach?._id,
       date: dayjs(lesson.lessonDate),
-      time: dayjs(lesson.lessonDate).format('HH:00'),
+      time: timeArray,
+      duration: duration,
       branchId: lesson.branch?._id || lesson.branch,
       commissionRate: lesson.commissionRate || sc?.commissionRate || undefined,
       company: lesson.company || sc?.company || undefined,
@@ -352,12 +367,14 @@ const Schedule = () => {
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
       const formattedDate = values.date.format('YYYY-MM-DD');
-      const lessonDate = new Date(`${formattedDate}T${values.time}:00`);
+      const timeStr = Array.isArray(values.time) ? [...values.time].sort()[0] : values.time;
+      const lessonDate = new Date(`${formattedDate}T${timeStr}:00`);
 
       const payload = {
         status: values.status,
         coach: values.coachId,
         lessonDate: lessonDate,
+        duration: values.duration || 1,
       };
 
       if (values.branchId) payload.branch = values.branchId;
@@ -482,13 +499,23 @@ const Schedule = () => {
     // Fill grid with lessons
     (dailyData.lessons || []).forEach((lesson) => {
       if (!lesson.coach) return;
-      const d = new Date(lesson.lessonDate);
-      const h = String(d.getHours()).padStart(2, '0');
-      const timeKey = `${h}:00`;
-      const coachId = lesson.coach._id;
+      
+      const duration = lesson.duration || 1;
+      
+      for (let i = 0; i < duration; i++) {
+        const d = new Date(lesson.lessonDate);
+        d.setHours(d.getHours() + i);
+        const h = String(d.getHours()).padStart(2, '0');
+        const timeKey = `${h}:00`;
+        const coachId = lesson.coach._id;
 
-      if (grid[timeKey] && grid[timeKey][coachId] !== undefined) {
-        grid[timeKey][coachId].push(lesson);
+        if (grid[timeKey] && grid[timeKey][coachId] !== undefined) {
+          grid[timeKey][coachId].push({
+             ...lesson, 
+             _isContinuation: i > 0, 
+             _continuationIndex: i
+          });
+        }
       }
     });
 
@@ -588,11 +615,11 @@ const Schedule = () => {
                     <Text>มาเรียนแล้ว</Text>
                   </Flex>
                   <Flex align="center" gap="1">
-                    <XCircle size="14" color="#E53E3E" />
+                    <CheckCircle size="14" color="#38A169" />
                     <Text>ไม่มาเรียน</Text>
                   </Flex>
                   <Flex align="center" gap="1">
-                    <AlertCircle size="14" color="#A0AEC0" />
+                    <XCircle size="14" color="#E53E3E" />
                     <Text>ยกเลิก</Text>
                   </Flex>
                 </Flex>
@@ -954,7 +981,7 @@ const Schedule = () => {
                                   STATUS_COLORS.completed;
                                 return (
                                   <Box
-                                    key={lesson._id || lIdx}
+                                    key={lesson._id ? `${lesson._id}-${lIdx}` : lIdx}
                                     p="1.5"
                                     borderRadius="md"
                                     bg={statusInfo.bg}
@@ -963,6 +990,8 @@ const Schedule = () => {
                                     mb={
                                       lIdx < cellLessons.length - 1 ? '1' : '0'
                                     }
+                                    opacity={lesson._isContinuation ? 0.7 : 1}
+                                    style={lesson._isContinuation ? { borderTopLeftRadius: 0, borderTopRightRadius: 0, borderTop: '1px dashed #E2E8F0' } : {}}
                                     _hover={{
                                       opacity: 0.8,
                                       transform: 'scale(1.02)',
@@ -998,10 +1027,11 @@ const Schedule = () => {
                                       </Badge>
                                     )}
                                     <Flex align="center" gap="1" mt="0.5">
-                                      {lesson.status !== 'test' && (
+                                        {lesson.status !== 'test' && (
                                         <Text fontSize="10px" color="gray.500">
                                           {lesson.lessonNumber}/
                                           {sc?.totalLessons || '-'}
+                                          {lesson.duration > 1 ? ` (${lesson.duration}ชม)` : ''}
                                         </Text>
                                       )}
                                       {lesson.status === 'completed' ? (
@@ -1010,15 +1040,15 @@ const Schedule = () => {
                                           color="#38A169"
                                         />
                                       ) : lesson.status === 'no_show' ? (
-                                        <XCircle size="12" color="#E53E3E" />
+                                        <CheckCircle size="12" color="#38A169" />
                                       ) : lesson.status ===
                                         'test' ? null : lesson.status ===
                                         'booked' ? (
                                         <Clock size="12" color="#3182CE" />
                                       ) : lesson.status === 'cancelled' ? (
-                                        <AlertCircle
+                                        <XCircle
                                           size="12"
-                                          color="#A0AEC0"
+                                          color="#E53E3E"
                                         />
                                       ) : (
                                         <AlertCircle
@@ -1665,8 +1695,28 @@ const Schedule = () => {
                   style={{ flex: 1 }}
                 >
                   <AntSelect
+                    mode="multiple"
                     placeholder="เลือกเวลา"
+                    style={{ width: '100%' }}
                     options={TIME_SLOTS.map((t) => ({ label: t, value: t }))}
+                    onChange={(val) => {
+                      form.setFieldsValue({ duration: val && val.length > 0 ? val.length : 1 });
+                    }}
+                  />
+                </Form.Item>
+                <Form.Item
+                  name="duration"
+                  label="จำนวนชั่วโมง"
+                  initialValue={1}
+                  style={{ flex: 1 }}
+                >
+                  <AntSelect
+                    options={[
+                      { label: '1 ชั่วโมง', value: 1 },
+                      { label: '2 ชั่วโมง', value: 2 },
+                      { label: '3 ชั่วโมง', value: 3 },
+                      { label: '4 ชั่วโมง', value: 4 },
+                    ]}
                   />
                 </Form.Item>
               </Flex>
@@ -1841,12 +1891,35 @@ const Schedule = () => {
               style={{ flex: 1 }}
             >
               <AntSelect
+                mode="multiple"
                 placeholder="เลือกเวลา"
+                style={{ width: '100%' }}
                 disabled={
                   JSON.parse(localStorage.getItem('user') || '{}').role !==
                   'admin'
                 }
                 options={TIME_SLOTS.map((t) => ({ label: t, value: t }))}
+                onChange={(val) => {
+                  editForm.setFieldsValue({ duration: val && val.length > 0 ? val.length : 1 });
+                }}
+              />
+            </Form.Item>
+            <Form.Item
+              name="duration"
+              label="จำนวนชั่วโมง"
+              style={{ flex: 1 }}
+            >
+              <AntSelect
+                disabled={
+                  JSON.parse(localStorage.getItem('user') || '{}').role !==
+                  'admin'
+                }
+                options={[
+                  { label: '1 ชั่วโมง', value: 1 },
+                  { label: '2 ชั่วโมง', value: 2 },
+                  { label: '3 ชั่วโมง', value: 3 },
+                  { label: '4 ชั่วโมง', value: 4 },
+                ]}
               />
             </Form.Item>
           </Flex>

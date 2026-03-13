@@ -6,6 +6,7 @@ const lessonRecordSchema = new mongoose.Schema({
   lessonNumber: { type: Number, required: true },        // ครั้งที่ (1, 2, 3, ...)
   lessonDate: { type: Date, required: true },
   status: { type: String, enum: ['completed', 'no_show', 'cancelled', 'active', 'test', 'booked', 'legacy'], default: 'active' },
+  duration: { type: Number, default: 1, min: 1, max: 24 }, // จำนวนชั่วโมงที่เรียน (1 ชม = 1 ครั้ง)
   notes: { type: String, default: '' },
   // Per-lesson commission override (default from StudentCourse, admin can change)
   commissionRate: { type: Number },                        // e.g. 40, 45, 50, 55, 60, 70

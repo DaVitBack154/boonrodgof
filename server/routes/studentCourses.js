@@ -15,10 +15,11 @@ async function updateCourseProgress(courseId) {
   const course = await StudentCourse.findById(courseId);
   if (!course) return;
 
-  const count = await LessonRecord.countDocuments({
+  const records = await LessonRecord.find({
     studentCourse: course._id,
     status: { $in: ['completed', 'legacy', 'no_show'] }
   });
+  const count = records.reduce((sum, rec) => sum + (rec.duration || 1), 0);
 
   course.lessonsCompleted = count;
   if (count >= course.totalLessons) {
@@ -32,20 +33,40 @@ async function updateCourseProgress(courseId) {
 }
 router.post('/test-lesson', async (req, res) => {
   try {
-    const { testCustomerName, coach, lessonDate, referredBy, company, branch } = req.body;
+    const { testCustomerName, coach, lessonDate, referredBy, company, branch, duration = 1 } = req.body;
     if (!testCustomerName || !coach || !lessonDate || !company || !branch) {
       return res.status(400).json({ error: 'กรุณากรอกข้อมูลให้ครบ (ชื่อลูกค้า, โค้ช, วันที่, บริษัท, สาขา)' });
     }
 
     // ตรวจสอบว่าโค้ชมีสอนเวลานี้หรือยัง (ห้ามจองทับ)
-    const existingLesson = await LessonRecord.findOne({
+    const reqLessonDate = new Date(lessonDate);
+    const startOfDay = new Date(reqLessonDate);
+    startOfDay.setHours(0,0,0,0);
+    const endOfDay = new Date(reqLessonDate);
+    endOfDay.setHours(23,59,59,999);
+
+    const existingLessons = await LessonRecord.find({
       coach: coach,
-      lessonDate: new Date(lessonDate),
+      lessonDate: { $gte: startOfDay, $lte: endOfDay },
       status: { $ne: 'cancelled' }
     }).populate('coach', 'firstNameTh');
 
-    if (existingLesson) {
-      const coachName = existingLesson.coach ? existingLesson.coach.firstNameTh : 'โค้ช';
+    const newStart = reqLessonDate;
+    const newEnd = new Date(newStart.getTime() + duration * 60 * 60 * 1000);
+    let overlappingLesson = null;
+    
+    for (const ex of existingLessons) {
+      const exStart = new Date(ex.lessonDate);
+      const exDur = ex.duration || 1;
+      const exEnd = new Date(exStart.getTime() + exDur * 60 * 60 * 1000);
+      if (newStart < exEnd && exStart < newEnd) {
+        overlappingLesson = ex;
+        break;
+      }
+    }
+
+    if (overlappingLesson) {
+      const coachName = overlappingLesson.coach ? overlappingLesson.coach.firstNameTh : 'โค้ช';
       return res.status(400).json({ 
         error: `ไม่สามารถจองได้ ${coachName} มีคลาสสอนในเวลานี้แล้ว` 
       });
@@ -54,6 +75,7 @@ router.post('/test-lesson', async (req, res) => {
     const lesson = new LessonRecord({
       coach,
       lessonDate,
+      duration,
       lessonNumber: 1,
       status: 'test',
       testCustomerName,
@@ -265,16 +287,44 @@ router.post('/:id/lessons', async (req, res) => {
     const reqLessonDate = new Date(req.body.lessonDate);
     const reqCoach = req.body.coach;
     const isGroupLesson = req.body.isGroupLesson === true;
+    const duration = req.body.duration || 1;
+
+    // ตรวจสอบจำนวนชั่วโมงที่เหลือ
+    const remainingLessons = Math.max(0, course.totalLessons - course.lessonsCompleted);
+    if (duration > remainingLessons) {
+      return res.status(400).json({ 
+        error: `ไม่สามารถจองได้ จำนวนครั้งที่เหลือ (${remainingLessons}) ไม่เพียงพอสำหรับการจอง ${duration} ชั่วโมง` 
+      });
+    }
     
     if (reqCoach && reqLessonDate && !isGroupLesson) {
-      const existingLesson = await LessonRecord.findOne({
+      const startOfDay = new Date(reqLessonDate);
+      startOfDay.setHours(0,0,0,0);
+      const endOfDay = new Date(reqLessonDate);
+      endOfDay.setHours(23,59,59,999);
+
+      const existingLessons = await LessonRecord.find({
         coach: reqCoach,
-        lessonDate: reqLessonDate,
+        lessonDate: { $gte: startOfDay, $lte: endOfDay },
         status: { $ne: 'cancelled' }
       }).populate('coach', 'firstNameTh');
 
-      if (existingLesson) {
-        const coachName = existingLesson.coach ? existingLesson.coach.firstNameTh : 'โค้ช';
+      const newStart = reqLessonDate;
+      const newEnd = new Date(newStart.getTime() + duration * 60 * 60 * 1000);
+      let overlappingLesson = null;
+      
+      for (const ex of existingLessons) {
+        const exStart = new Date(ex.lessonDate);
+        const exDur = ex.duration || 1;
+        const exEnd = new Date(exStart.getTime() + exDur * 60 * 60 * 1000);
+        if (newStart < exEnd && exStart < newEnd) {
+          overlappingLesson = ex;
+          break;
+        }
+      }
+
+      if (overlappingLesson) {
+        const coachName = overlappingLesson.coach ? overlappingLesson.coach.firstNameTh : 'โค้ช';
         return res.status(400).json({ 
           error: `ไม่สามารถจองได้ ${coachName} มีคลาสสอนในเวลานี้แล้ว` 
         });
@@ -338,25 +388,72 @@ router.put('/:courseId/lessons/:lessonId', async (req, res) => {
     const reqLessonDate = req.body.lessonDate ? new Date(req.body.lessonDate) : null;
     const reqCoach = req.body.coach;
     const newStatus = req.body.status;
+    const newDuration = req.body.duration || originalLesson.duration || 1;
 
-    // เช็คว่าโค้ชหรือเวลาถูกเปลี่ยนจริงๆ หรือไม่
+    // ถ้ามีการระบุ courseId ตรวจสอบชั่วโมงคงเหลือถ้า duration เพิ่มขึ้น และไม่ใช่การยกเลิก/ทดลองเรียน
+    if (req.params.courseId !== 'standalone' && newStatus !== 'cancelled' && newStatus !== 'test') {
+      const course = await StudentCourse.findById(req.params.courseId);
+      if (course) {
+        const oldDuration = newStatus === 'no_show' || originalLesson.status === 'completed' || originalLesson.status === 'legacy' ? (originalLesson.duration || 1) : 0;
+        // The simplistic check below assumes we just re-verify against the current remaining + the old lesson's duration if it was already consuming quota. However, since lessonsCompleted includes current completed/no_show, we need to balance it properly.
+        const currentConsuming = ['completed', 'legacy', 'no_show'].includes(originalLesson.status);
+        const newConsuming = ['completed', 'legacy', 'no_show'].includes(newStatus);
+        
+        let delta = 0;
+        if (currentConsuming && newConsuming) delta = newDuration - (originalLesson.duration || 1);
+        else if (!currentConsuming && newConsuming) delta = newDuration;
+        else if (currentConsuming && !newConsuming) delta = -(originalLesson.duration || 1);
+        
+        const remainingLessons = course.totalLessons - course.lessonsCompleted;
+        if (delta > remainingLessons && delta > 0 && !req.body.bypassQuota) {
+           // We allow bypassQuota if necessary, but returning error initially.
+           // However actually if status changes from active to active but duration increases: delta is 0 here since it's not consuming.
+           // So if delta == 0, but duration > remainingLessons, should we block? Yes.
+           const futureRemaining = course.totalLessons - course.lessonsCompleted + (currentConsuming ? (originalLesson.duration || 1) : 0);
+           if (newDuration > futureRemaining) {
+              return res.status(400).json({ error: `ไม่สามารถแก้ไขได้ จำนวนครั้งที่เหลือไม่พอสำหรับ ${newDuration} ชั่วโมง` });
+           }
+        }
+      }
+    }
+
+    // เช็คว่าโค้ช วหรือเวลา หรือ duration ถูกเปลี่ยนจริงๆ หรือไม่
     const coachChanged = reqCoach && reqCoach !== originalLesson.coach?.toString();
     const timeChanged = reqLessonDate && reqLessonDate.getTime() !== new Date(originalLesson.lessonDate).getTime();
+    const durationChanged = newDuration !== originalLesson.duration;
 
-    // ตรวจสอบซ้ำเฉพาะเมื่อมีการเปลี่ยนโค้ชหรือเวลา
-    if ((coachChanged || timeChanged) && newStatus !== 'cancelled') {
+    // ตรวจสอบซ้ำเฉพาะเมื่อมีการเปลี่ยนโค้ชหรือเวลา หรือ duration
+    if ((coachChanged || timeChanged || durationChanged) && newStatus !== 'cancelled') {
       const checkCoach = reqCoach || originalLesson.coach;
-      const checkDate = reqLessonDate || originalLesson.lessonDate;
+      const checkDate = reqLessonDate || new Date(originalLesson.lessonDate);
+      const startOfDay = new Date(checkDate);
+      startOfDay.setHours(0,0,0,0);
+      const endOfDay = new Date(checkDate);
+      endOfDay.setHours(23,59,59,999);
 
-      const existingLesson = await LessonRecord.findOne({
+      const existingLessons = await LessonRecord.find({
         _id: { $ne: req.params.lessonId },
         coach: checkCoach,
-        lessonDate: checkDate,
+        lessonDate: { $gte: startOfDay, $lte: endOfDay },
         status: { $ne: 'cancelled' }
       }).populate('coach', 'firstNameTh');
 
-      if (existingLesson) {
-        const coachName = existingLesson.coach ? existingLesson.coach.firstNameTh : 'โค้ช';
+      const newStart = checkDate;
+      const newEnd = new Date(newStart.getTime() + newDuration * 60 * 60 * 1000);
+      let overlappingLesson = null;
+      
+      for (const ex of existingLessons) {
+        const exStart = new Date(ex.lessonDate);
+        const exDur = ex.duration || 1;
+        const exEnd = new Date(exStart.getTime() + exDur * 60 * 60 * 1000);
+        if (newStart < exEnd && exStart < newEnd) {
+          overlappingLesson = ex;
+          break;
+        }
+      }
+
+      if (overlappingLesson) {
+        const coachName = overlappingLesson.coach ? overlappingLesson.coach.firstNameTh : 'โค้ช';
         return res.status(400).json({ 
           error: `ไม่สามารถเปลี่ยนเวลา/โค้ชได้ ${coachName} มีคลาสสอนในเวลานี้แล้ว` 
         });
@@ -413,7 +510,7 @@ router.get('/commission/summary', async (req, res) => {
     // Find all completed lessons in this period
     const lessons = await LessonRecord.find({
       lessonDate: { $gte: startDate, $lte: endDate },
-      status: 'completed',
+      status: { $in: ['completed', 'no_show'] },
     }).populate({
       path: 'studentCourse',
       select: 'commissionPerLesson perLessonRate commissionRate studentName company',
@@ -436,10 +533,11 @@ router.get('/commission/summary', async (req, res) => {
       // Use lesson-level commissionRate if available, otherwise fall back to course
       const lessonRate = lesson.commissionRate != null ? lesson.commissionRate : lesson.studentCourse.commissionRate;
       const perLessonRate = lesson.studentCourse.perLessonRate || 0;
-      const commissionAmount = Math.round((perLessonRate * lessonRate / 100) * 100) / 100;
+      const lessonDuration = lesson.duration || 1;
+      const commissionAmount = Math.round((perLessonRate * lessonRate / 100) * 100) / 100 * lessonDuration;
       const lessonCompany = lesson.company || lesson.studentCourse.company || '';
       
-      coachCommission[coachId].totalLessons += 1;
+      coachCommission[coachId].totalLessons += lessonDuration;
       coachCommission[coachId].totalCommission += commissionAmount;
       coachCommission[coachId].details.push({
         studentName: lesson.studentCourse.studentName,
@@ -448,6 +546,7 @@ router.get('/commission/summary', async (req, res) => {
         commissionRate: lessonRate,
         company: lessonCompany,
         date: lesson.lessonDate,
+        duration: lessonDuration,
       });
     }
 
